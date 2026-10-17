@@ -43,7 +43,16 @@ async function startFakePrinter(opts = {}) {
     listAfter: new Map(),           // имя -> время, с которого файл виден в списке
     camera: false,
     starts: 0,
+    // Управление (401/402/403) - как у настоящего: координаты, цели, вентиляторы, свет, скорость.
+    coord: Object.assign({ x: 0, y: 0, z: 0 }, opts.coord),
+    homed: opts.homed !== undefined ? opts.homed : true,
+    targetNozzle: 0, targetBed: 0,
+    fans: { ModelFan: 0, AuxiliaryFan: 0, BoxFan: 0 },
+    light: 0,
+    speed: 100,
   };
+  const FREE = [0, 8, 9];
+  const LIMIT = { x: 256, y: 256, z: 256 };
   const log = [];
   let failChunks = faults.failChunks || 0;
   let dropTimes = faults.dropTimes === undefined ? 1 : faults.dropTimes;
@@ -53,10 +62,14 @@ async function startFakePrinter(opts = {}) {
 
   const statusMsg = () => ({
     Status: {
-      CurrentStatus: [state.status === 0 ? 0 : 1],
+      CurrentStatus: [FREE.includes(state.status) ? 0 : 1],
       TempOfNozzle: 26.5, TempOfHotbed: 24.1, TempOfBox: 25,
+      TempTargetNozzle: state.targetNozzle, TempTargetHotbed: state.targetBed, TempTargetBox: 0,
+      CurrentFanSpeed: Object.assign({}, state.fans),
+      LightStatus: { SecondLight: state.light, RgbLight: [0, 0, 0] },
+      CurrenCoord: [state.coord.x, state.coord.y, state.coord.z].map((v) => v.toFixed(2)).join(','),
       PrintInfo: { Status: state.status, CurrentLayer: state.status === 13 ? 8 : 0, TotalLayer: state.status === 13 ? 22 : 0,
-        CurrentTicks: 600, TotalTicks: 3600, Filename: state.current || '', Progress: 30 },
+        CurrentTicks: 600, TotalTicks: 3600, Filename: state.current || '', Progress: 30, PrintSpeedPct: state.speed },
     },
     MainboardID: MAINBOARD, TimeStamp: Math.floor(Date.now() / 1000), Topic: 'sdcp/status/' + MAINBOARD,
   });
@@ -147,6 +160,39 @@ async function startFakePrinter(opts = {}) {
         case 129: respond({}); state.status = 6; break;
         case 131: respond({}); state.status = 13; break;
         case 130: respond({}); state.status = 8; break;
+        case 401: {
+          // Занятый принтер оси не двигает (Ack 1), без «домой» - Ack 3, как у Elegoo.
+          const a = d.Data || {};
+          const k = String(a.Axis || '').toLowerCase();
+          if (!FREE.includes(state.status)) { respond({ Ack: 1 }); break; }
+          if (!state.homed) { respond({ Ack: 3 }); break; }
+          if (!['x', 'y', 'z'].includes(k) || !Number.isFinite(a.Step)) { respond({ Ack: 2 }); break; }
+          state.coord[k] = Math.max(0, Math.min(LIMIT[k], state.coord[k] + a.Step));
+          respond({});
+          ws.send(JSON.stringify(statusMsg()));
+          break;
+        }
+        case 402: {
+          const a = String((d.Data && d.Data.Axis) || '');
+          if (!FREE.includes(state.status)) { respond({ Ack: 1 }); break; }
+          if (!['XYZ', 'X', 'Y', 'Z'].includes(a)) { respond({ Ack: 2 }); break; }
+          for (const k of a.toLowerCase()) state.coord[k] = 0;
+          if (a === 'XYZ') state.homed = true;
+          respond({});
+          ws.send(JSON.stringify(statusMsg()));
+          break;
+        }
+        case 403: {
+          const a = d.Data || {};
+          if (a.TempTargetNozzle !== undefined) state.targetNozzle = a.TempTargetNozzle;
+          if (a.TempTargetHotbed !== undefined) state.targetBed = a.TempTargetHotbed;
+          if (a.TargetFanSpeed) Object.assign(state.fans, a.TargetFanSpeed);
+          if (a.LightStatus && a.LightStatus.SecondLight !== undefined) state.light = a.LightStatus.SecondLight;
+          if (a.PrintSpeedPct !== undefined) state.speed = a.PrintSpeedPct;
+          respond({});
+          ws.send(JSON.stringify(statusMsg()));
+          break;
+        }
         case 386: state.camera = d.Data && d.Data.Enable === 1; respond({ VideoUrl: '127.0.0.1:' + server.address().port + '/video' }); break;
         default: respond({ Ack: 1 });
       }
@@ -158,16 +204,21 @@ async function startFakePrinter(opts = {}) {
   udp.on('message', (buf, rinfo) => {
     if (String(buf) !== 'M99999') return;
     log.push({ udp: 'M99999' });
-    udp.send(Buffer.from(JSON.stringify({ Id: 'x', Data: { Name: 'Fake CC', MachineName: 'Elegoo Centauri Carbon', MainboardIP: '127.0.0.1', MainboardID: MAINBOARD } })), rinfo.port, rinfo.address);
+    // announcePort: адрес вместе с портом подделки, чтобы найденный «принтер» был этой подделкой.
+    const ip = opts.announcePort ? '127.0.0.1:' + server.address().port : '127.0.0.1';
+    udp.send(Buffer.from(JSON.stringify({ Id: 'x', Data: { Name: 'Fake CC', MachineName: 'Elegoo Centauri Carbon', MainboardIP: ip, MainboardID: MAINBOARD } })), rinfo.port, rinfo.address);
   });
   await new Promise((r) => udp.bind(0, '127.0.0.1', r));
   const port = server.address().port;
+  let closing = null;
   return {
     host: '127.0.0.1:' + port, hostname: '127.0.0.1', port, udpPort: udp.address().port, mainboardId: MAINBOARD,
     state, log, faults,
     setStatus(s) { state.status = s; for (const c of wss.clients) c.send(JSON.stringify(statusMsg())); },
+    pushStatus() { for (const c of wss.clients) c.send(JSON.stringify(statusMsg())); },
     commands(cmd) { return log.filter((e) => e.cmd === cmd); },
-    close: () => new Promise((r) => { for (const c of wss.clients) c.terminate(); wss.close(); udp.close(); server.close(() => r()); server.closeAllConnections && server.closeAllConnections(); }),
+    // Повторный close ничего не делает (закон «обрыв связи» закрывает подделку посреди теста).
+    close: () => closing || (closing = new Promise((r) => { for (const c of wss.clients) c.terminate(); wss.close(); udp.close(); server.close(() => r()); server.closeAllConnections && server.closeAllConnections(); })),
   };
 }
 

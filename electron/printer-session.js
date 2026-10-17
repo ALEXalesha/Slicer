@@ -5,6 +5,9 @@
 const fs = require('fs');
 const { PrinterClient } = require('../src/core/printer-client');
 const Aifp = require('../src/core/aifp');
+const Control = require('../src/core/printer-control');
+
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 class PrinterPanel {
   constructor({ send, connect = PrinterClient.connect, aifpDir = Aifp.defaultDir() }) {
@@ -45,6 +48,44 @@ class PrinterPanel {
     const fn = { pause: () => c.pause(), resume: () => c.resume(), stop: () => c.stop(), status: () => c.status() }[what];
     if (!fn) return { ok: false, code: 'bad-command' };
     try { const r = await fn(); return { ok: true, result: r }; } catch (e) { return { ok: false, code: e.code || 'failed' }; }
+  }
+
+  /**
+   * Управление из окна: окно - чужой код, поэтому всё проверяется здесь. Оси и «домой» -
+   * только если последний статус - простой (неизвестный = занят), иначе 'busy' и 401/402
+   * не уходят. PrinterClient ещё раз спрашивает свежий статус перед самой командой.
+   */
+  async control(kind, args) {
+    const c = this.client;
+    if (!c || c.closed) return { ok: false, code: 'offline' };
+    const a = isObj(args) ? args : {};
+    let run;
+    try {
+      switch (kind) {
+        case 'move': {
+          const step = Control.jogStep(a.axis, a.dir, a.size);
+          run = () => c.move(a.axis, step);
+          break;
+        }
+        case 'home': { Control.homeData(a.axis); run = () => c.home(a.axis); break; }
+        case 'temp': { const t = {}; if (a.nozzle !== undefined) t.nozzle = a.nozzle; if (a.bed !== undefined) t.bed = a.bed; Control.tempData(t); run = () => c.setTemps(t); break; }
+        case 'fans': { const f = { model: a.model, aux: a.aux, box: a.box }; Control.fanData(f); run = () => c.setFans(f); break; }
+        case 'light': { Control.lightData(a.on); run = () => c.setLight(a.on); break; }
+        case 'speed': { Control.speedData(a.pct); run = () => c.setSpeed(a.pct); break; }
+        default: return { ok: false, code: 'bad-command' };
+      }
+    } catch (e) {
+      return { ok: false, code: e.code || 'bad-data' };
+    }
+    if ((kind === 'move' || kind === 'home') && !Control.canMove(c.lastStatus)) return { ok: false, code: 'busy' };
+    try {
+      await run();
+    } catch (e) {
+      return { ok: false, code: e.code || 'failed', ack: e.ack };
+    }
+    let status = c.lastStatus;
+    try { status = await c.status({ timeoutMs: 3000 }); } catch { /* статус придёт сам */ }
+    return { ok: true, status };
   }
 
   async camera() {

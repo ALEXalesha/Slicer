@@ -29,6 +29,19 @@ function isHost(s) {
   return !!m && (m[2] === undefined || (Number(m[2]) >= 1 && Number(m[2]) <= 65535));
 }
 
+/**
+ * Адрес, как его вводит человек: «http://192.168.0.50/», « 192.168.0.50 » -> «192.168.0.50».
+ * Срезаем схему (http, https, ws), хвостовые «/» и пробелы. Если и после этого не адрес - null
+ * (окно пишет «Адрес вида 192.168.0.50», а не молча заменяет пустым).
+ */
+function normalizeHost(s) {
+  if (typeof s !== 'string') return null;
+  const t = s.trim();
+  const h = t.replace(/^(?:https?|wss?):\/\//i, '').replace(/\/+$/, '');
+  if (t && !h) return null;                    // «http://» без адреса - не пустой адрес, а ошибка
+  return isHost(h) ? h : null;
+}
+
 function plainObject(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
 }
@@ -41,7 +54,7 @@ function normalize(raw) {
     theme: THEMES.includes(r.theme) ? r.theme : DEFAULTS.theme,
     mode: MODES.includes(r.mode) ? r.mode : DEFAULTS.mode,
     choice: plainObject(r.choice),
-    printerHost: isHost(r.printerHost) ? r.printerHost : DEFAULTS.printerHost,
+    printerHost: normalizeHost(r.printerHost) ?? DEFAULTS.printerHost,
     bedLeveling: typeof r.bedLeveling === 'boolean' ? r.bedLeveling : DEFAULTS.bedLeveling,
     advanced: { process: plainObject(adv.process) || {}, filament: plainObject(adv.filament) || {} },
     quality: typeof r.quality === 'string' ? r.quality : DEFAULTS.quality,
@@ -65,4 +78,4 @@ function save(file, settings) {
   fs.renameSync(tmp, file);
 }
 
-module.exports = { load, save, normalize, DEFAULTS, THEMES, LANGS, MODES, isHost };
+module.exports = { load, save, normalize, DEFAULTS, THEMES, LANGS, MODES, isHost, normalizeHost };

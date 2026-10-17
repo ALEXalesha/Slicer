@@ -50,6 +50,17 @@ function registerIpc(ctx) {
     index = index || Presets.buildIndex(engine.profilesDir);
     return index;
   };
+  // Поиск в сети. В тестах - никогда не широковещанием: только на порт подделки по 127.0.0.1
+  // (SLICER_DISCOVER_PORT), без него - пусто. Настоящий принтер тесты не видят и не трогают.
+  const findPrinters = () => {
+    if (ctx.test) {
+      const port = Number(process.env.SLICER_DISCOVER_PORT);
+      if (!Number.isInteger(port) || port <= 0) return Promise.resolve([]);
+      return discover({ timeoutMs: 700, address: '127.0.0.1', port });
+    }
+    return discover({ timeoutMs: 2000 });
+  };
+
   let last = null;            // последняя нарезка: {gcodePath, info, modelName, filament}
   let sending = false;
 
@@ -142,11 +153,13 @@ function registerIpc(ctx) {
     if (sending) return { ok: false, code: 'sending' };
     sending = true;
     try {
-      let host = settings.printerHost;
+      const host = settings.printerHost;
+      // Адрес не задан: не печатаем на первый ответивший принтер молча, а отдаём окну
+      // найденные - оно спросит «Печатать на <имя> (<IP>)?» и после «да» запомнит адрес.
       if (!host) {
-        const found = await discover({ timeoutMs: 2000 });
+        const found = (await findPrinters()).filter((f) => Settings.isHost(f.host) && f.host);
         if (!found.length) return { ok: false, code: 'no-host' };
-        host = found[0].host;
+        return { ok: false, code: 'confirm-host', found: found.map((f) => ({ name: f.name || f.model || '', host: f.host })) };
       }
       const buffer = fs.readFileSync(last.gcodePath);
       const remoteName = printerFileName({ model: last.modelName, filament: last.filament, timeSec: last.info.timeSec });
@@ -161,10 +174,16 @@ function registerIpc(ctx) {
     }
   });
 
-  ipcMain.handle('printer:discover', async () => discover({ timeoutMs: 2000 }));
+  ipcMain.handle('printer:discover', async () => findPrinters());
 
   const panel = new PrinterPanel({ send });
-  ipcMain.handle('printer:connect', (_e, host) => panel.connect(Settings.isHost(host) && host ? host : settings.printerHost));
+  ipcMain.handle('printer:connect', (_e, raw) => {
+    if (raw !== undefined && raw !== null && typeof raw !== 'string') return { ok: false, code: 'bad-host' };
+    const host = Settings.normalizeHost(raw || '');
+    if (host === null) return { ok: false, code: 'bad-host' };
+    return panel.connect(host || settings.printerHost);
+  });
+  ipcMain.handle('printer:control', (_e, kind, args) => panel.control(typeof kind === 'string' ? kind : '', args));
   ipcMain.handle('printer:disconnect', () => panel.disconnect());
   ipcMain.handle('printer:command', (_e, what) => panel.command(what));
   ipcMain.handle('printer:camera', () => panel.camera());
