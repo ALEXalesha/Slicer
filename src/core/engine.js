@@ -14,14 +14,16 @@ class EngineError extends Error {
   }
 }
 
-function engineArgs({ configFiles, modelFiles }) {
+// arrange: 1 - движок сам расставляет модели (старый путь, файлы с диска как есть);
+// 0 - модели стоят там, где их поставил человек в окне (3MF стола, замер 18.10).
+function engineArgs({ configFiles, modelFiles, arrange = 1 }) {
   return [
     '--datadir', 'data',
     '--slice', '0',
     '--load-settings', configFiles.machine + ';' + configFiles.process,
     '--load-filaments', configFiles.filament,
     '--outputdir', 'out',
-    '--arrange', '1',
+    '--arrange', String(arrange ? 1 : 0),
     ...modelFiles,
   ];
 }
@@ -35,17 +37,21 @@ function run(exe, args, opts) {
 }
 
 /** @returns {Promise<{gcodePath: string, info: object}>} */
-async function slice({ exe, jobDir, configFiles, modelFiles, timeoutMs = 600000 }) {
+async function slice({ exe, jobDir, configFiles, modelFiles, arrange = 1, timeoutMs = 600000 }) {
   if (!exe || !fs.existsSync(exe)) throw new EngineError('not-found', exe || '');
   const outDir = path.join(jobDir, 'out');
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
   fs.mkdirSync(path.join(jobDir, 'data'), { recursive: true });
-  const r = await run(exe, engineArgs({ configFiles, modelFiles }), { cwd: jobDir, windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 });
+  const r = await run(exe, engineArgs({ configFiles, modelFiles, arrange }), { cwd: jobDir, windowsHide: true, timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 });
   const tail = (r.stdout + r.stderr).trim().split(/\r?\n/).slice(-3).join(' ');
   if (r.err && (r.err.killed || r.err.signal)) throw new EngineError('timeout', tail);
   const gcodePath = path.join(outDir, 'plate_1.gcode');
   if (r.err || !fs.existsSync(gcodePath)) throw new EngineError('failed', tail || (r.err && String(r.err.code)) || 'no output');
+  // Не влезло на один стол - движок раскладывает остальное на plate_2, plate_3...: печать
+  // только первой пластины молча теряла модели (ревьювер 17.10: из 10 кубов 6 пропали).
+  const plates = fs.readdirSync(outDir).filter((f) => /^plate_\d+\.gcode$/.test(f)).length;
+  if (plates > 1) throw new EngineError('plates', String(plates));
   const info = parseGcodeInfo(fs.readFileSync(gcodePath, 'utf8'));
   if (!info.layers) throw new EngineError('empty', '');
   return { gcodePath, info };

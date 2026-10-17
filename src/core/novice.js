@@ -120,6 +120,22 @@ function composeConfigs(index, { mode = 'novice', choice, advanced, quality, pla
   return { machine, process, filament, choice: c };
 }
 
+/**
+ * Поддержки, поставленные кистью (пункт 3 Алексея). Замер 18.10 на движке: раскраска
+ * «ставить» при выключенных поддержках ничего не даёт, а с tree(manual) - поддержки ровно
+ * там, где покрашено. Поэтому: выбрано «Нет», но человек покрасил - ручные деревья только
+ * по раскраске; выбрано «Где нужно»/«Везде» - авто остаётся, раскраска добавляет и
+ * запрещает. «Запретить» работает при любых включённых поддержках.
+ */
+function applyPaintedSupports(process, rawChoice, painted) {
+  const c = normalizeChoice(rawChoice);
+  if (!painted || !painted.enforce || c.supports !== 'none') return process;
+  process.enable_support = '1';
+  process.support_type = 'tree(manual)';
+  process.support_on_build_plate_only = '0';
+  return process;
+}
+
 const PROTECTED = new Set(['type', 'name', 'inherits', 'from', 'instantiation', 'compatible_printers', 'setting_id']);
 
 function applyEdits(target, edits) {
@@ -135,5 +151,5 @@ function applyEdits(target, edits) {
 module.exports = {
   MACHINE, PROCESS, QUALITIES, PLATES, TEMP_LIMIT, FILAMENTS, SUPPORTS, NOVICE_ITEMS,
   FILAMENT_KEYS, PROCESS_KEYS, PETG_TESTED, PROTECTED,
-  normalizeChoice, noviceOverrides, composeConfigs, filamentInfo, applyEdits,
+  normalizeChoice, noviceOverrides, composeConfigs, filamentInfo, applyEdits, applyPaintedSupports,
 };

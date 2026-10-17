@@ -15,6 +15,65 @@ const { printerFileName } = require('../src/core/names');
 const { sendToPrinter } = require('../src/core/send');
 const { discover } = require('../src/core/discovery');
 const { PrinterPanel } = require('./printer-session');
+const { Worker } = require('worker_threads');
+const { parseModel } = require('../src/core/mesh');
+const { parseGcodePreview } = require('../src/core/gcode-preview');
+const { buildProject3mf } = require('../src/core/project3mf');
+const { bounds, multiply } = require('../src/core/geom');
+const { safeBase } = require('../src/core/names');
+
+const BED = 256;
+const MAX_OBJECTS = 500;
+const MAX_TRIANGLES = 30e6;
+
+// Разбор в отдельном потоке; если поток не завёлся (например, внутри упакованного app.asar
+// что-то не так) - разбираем здесь же: медленнее для окна, но работает.
+function runWorker(kind, file) {
+  return new Promise((resolve) => {
+    let w;
+    const inline = () => {
+      try {
+        const result = kind === 'model' ? parseModel(fs.readFileSync(file), file) : parseGcodePreview(fs.readFileSync(file, 'utf8'));
+        resolve({ ok: true, result });
+      } catch (e) { resolve({ ok: false, code: e.code || 'bad-file', detail: String(e.detail || e.message || '') }); }
+    };
+    try { w = new Worker(path.join(__dirname, 'worker.js'), { workerData: { kind, path: file } }); } catch { inline(); return; }
+    let done = false;
+    w.once('message', (m) => { done = true; resolve(m); w.terminate(); });
+    w.once('error', () => { if (!done) { done = true; inline(); } });
+    w.once('exit', () => { if (!done) { done = true; inline(); } });
+  });
+}
+
+/**
+ * Модели стола из окна -> проверенные объекты для 3MF. Окно - чужой код: проверяем типы,
+ * размеры и числа. Модель за краем стола - отказ с именами (ревьювер 17.10: движок молча
+ * раскладывал лишнее на другие пластины, печаталась только первая).
+ */
+function checkPlate(list) {
+  if (!Array.isArray(list) || !list.length) return { error: { ok: false, code: 'no-models' } };
+  if (list.length > MAX_OBJECTS) return { error: { ok: false, code: 'too-many', detail: String(list.length) } };
+  const out = [];
+  const offBed = [];
+  let tris = 0;
+  for (const o of list) {
+    if (!o || !(o.positions instanceof Float32Array) || !o.positions.length || o.positions.length % 9) return { error: { ok: false, code: 'bad-model' } };
+    if (!Array.isArray(o.matrix) || o.matrix.length !== 16 || !o.matrix.every(Number.isFinite)) return { error: { ok: false, code: 'bad-model' } };
+    const paint = o.paint instanceof Uint8Array && o.paint.length === o.positions.length / 9 ? o.paint : null;
+    tris += o.positions.length / 9;
+    if (tris > MAX_TRIANGLES) return { error: { ok: false, code: 'too-big' } };
+    const b = bounds(o.positions, o.matrix);
+    if (![...b.min, ...b.max].every(Number.isFinite)) return { error: { ok: false, code: 'bad-model' } };
+    const name = String(typeof o.name === 'string' ? o.name : 'model');
+    // на стол: низ модели ровно на z = 0
+    const matrix = Math.abs(b.min[2]) > 1e-6 ? multiply([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -b.min[2], 1], o.matrix) : o.matrix;
+    const e = 0.01;
+    if (b.min[0] < -e || b.min[1] < -e || b.max[0] > BED + e || b.max[1] > BED + e || b.size[2] > BED + e) offBed.push(name);
+    out.push({ name: safeBase(name.replace(/\.(stl|3mf|obj)$/i, ''), 40) || 'model', title: name, positions: o.positions, matrix, paint });
+  }
+  if (offBed.length) return { error: { ok: false, code: 'off-bed', names: offBed } };
+  return { objects: out, painted: { enforce: out.some((o) => o.paint && o.paint.includes(1)), block: out.some((o) => o.paint && o.paint.includes(2)) } };
+}
 
 const MAX_MODEL_BYTES = 512 * 1024 * 1024;
 
@@ -75,6 +134,19 @@ function registerIpc(ctx) {
     return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
   });
 
+  ipcMain.handle('models:load', async (_e, p) => {
+    if (!isModelPath(p)) return { ok: false, code: 'bad-path' };
+    const r = await runWorker('model', p);
+    if (!r.ok) return r;
+    return { ok: true, objects: r.result.objects, warnings: r.result.warnings };
+  });
+
+  ipcMain.handle('preview', async () => {
+    if (!last || !fs.existsSync(last.gcodePath)) return { ok: false, code: 'no-gcode' };
+    const r = await runWorker('preview', last.gcodePath);
+    return r.ok ? { ok: true, preview: r.result } : r;
+  });
+
   ipcMain.handle('presets:info', () => {
     let idx = null;
     try { idx = getIndex(); } catch { idx = null; }
@@ -103,9 +175,8 @@ function registerIpc(ctx) {
     return { process: c.process, filament: c.filament };
   });
 
-  ipcMain.handle('slice', async (_e, req) => {
-    const r = req && typeof req === 'object' ? req : {};
-    const models = (Array.isArray(r.models) ? r.models : []).filter((m) => m && isModelPath(m.path))
+  async function sliceFiles(r) {
+    const models = r.models.filter((m) => m && isModelPath(m.path))
       .map((m) => ({ path: m.path, name: typeof m.name === 'string' ? m.name : '' }));
     if (!models.length) return { ok: false, code: 'no-models' };
     let idx;
@@ -118,11 +189,42 @@ function registerIpc(ctx) {
       cleanJobs(root);
       const jobDir = path.join(root, 'job-' + Date.now());
       const job = prepareJob({ jobDir, models, configs });
+      last = null;
       const res = await slice({ exe: engine.exe, jobDir, ...job });
       const fil = Novice.filamentInfo(configs.choice.filament);
       last = { gcodePath: res.gcodePath, info: res.info, modelName: models[0].name || path.basename(models[0].path), filament: fil.label };
       const { settings: _s, ...short } = res.info;
       return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
+    } catch (e) {
+      return { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || '') };
+    }
+  }
+
+  ipcMain.handle('slice', async (_e, req) => {
+    const r = req && typeof req === 'object' ? req : {};
+    // Старый путь (окно 0.1.0 шлёт пути файлов): движок сам расставляет. Уйдёт, когда окно
+    // перейдёт на модели стола (objects).
+    if (!r.objects && Array.isArray(r.models)) return sliceFiles(r);
+    const plate = checkPlate(r.objects);
+    if (plate.error) return plate.error;
+    let idx;
+    try { idx = getIndex(); } catch (e) { return { ok: false, code: 'preset', detail: e.message }; }
+    if (!idx) return { ok: false, code: 'not-found' };
+    try {
+      const mode = r.mode === 'advanced' ? 'advanced' : 'novice';
+      const configs = Novice.composeConfigs(idx, { mode, choice: r.choice, advanced: settings.advanced, quality: settings.quality, plate: settings.plate });
+      Novice.applyPaintedSupports(configs.process, configs.choice, plate.painted);
+      const root = jobsRoot();
+      cleanJobs(root);
+      const jobDir = path.join(root, 'job-' + Date.now());
+      const buffer = buildProject3mf(plate.objects);
+      const job = prepareJob({ jobDir, models: [{ path: 'plate.3mf', name: 'plate', buffer }], configs });
+      last = null;
+      const res = await slice({ exe: engine.exe, jobDir, ...job, arrange: 0 });
+      const fil = Novice.filamentInfo(configs.choice.filament);
+      last = { gcodePath: res.gcodePath, info: res.info, modelName: plate.objects[0].title, filament: fil.label };
+      const { settings: _s, ...short } = res.info;
+      return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, objects: plate.objects.length, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
     } catch (e) {
       return { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || '') };
     }
@@ -174,4 +276,4 @@ function registerIpc(ctx) {
   return { get settings() { return settings; }, panel };
 }
 
-module.exports = { registerIpc, isModelPath, cleanJobs };
+module.exports = { registerIpc, isModelPath, cleanJobs, checkPlate };

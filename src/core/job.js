@@ -44,7 +44,8 @@ function writeJson(file, obj) {
 }
 
 /**
- * @param {{jobDir: string, models: Array<{path: string, name?: string}>, configs: {machine, process, filament}}} p
+ * @param {{jobDir: string, models: Array<{path: string, name?: string, buffer?: Buffer}>, configs: {machine, process, filament}}} p
+ *   buffer - готовый файл (3MF стола из окна), path тогда только для расширения
  * @returns {{configFiles: {machine, process, filament}, modelFiles: string[]}} имена файлов внутри jobDir
  */
 function prepareJob({ jobDir, models, configs }) {
@@ -64,7 +65,8 @@ function prepareJob({ jobDir, models, configs }) {
     if (!MODEL_EXT.includes(ext)) throw Object.assign(new Error('bad model type ' + ext), { code: 'bad-model' });
     const base = safeBase(m.name || path.basename(m.path, path.extname(m.path)), 40) || 'model';
     const name = base + '_' + (i + 1) + ext;
-    copyModel(m.path, path.join(jobDir, name));
+    if (m.buffer) fs.writeFileSync(path.join(jobDir, name), m.buffer);
+    else copyModel(m.path, path.join(jobDir, name));
     return name;
   });
   return { configFiles: { machine: 'machine.json', process: 'process.json', filament: 'filament.json' }, modelFiles };
