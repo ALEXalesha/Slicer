@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: http: file:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Slicer CC</title>
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Slicer CC</div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-prepare" class="tab active" data-view="prepare" data-i18n="tab.prepare">Подготовка</button>
+      <button role="tab" id="tab-printer" class="tab" data-view="printer" data-i18n="tab.printer">Принтер</button>
+    </nav>
+    <div class="seg" id="mode" role="radiogroup">
+      <button data-mode="novice" class="active" data-i18n="mode.novice">Новичок</button>
+      <button data-mode="advanced" data-i18n="mode.advanced">Продвинутый</button>
+    </div>
+    <div class="spacer"></div>
+    <select id="theme" aria-label="theme">
+      <option value="glass" data-i18n="theme.glass">Стеклянная</option>
+      <option value="formal" data-i18n="theme.formal">Строгая</option>
+      <option value="light" data-i18n="theme.light">Светлая</option>
+      <option value="night" data-i18n="theme.night">Ночная</option>
+      <option value="warm" data-i18n="theme.warm">Тёплая</option>
+    </select>
+    <select id="lang" aria-label="language">
+      <option value="ru">Русский</option>
+      <option value="en">English</option>
+    </select>
+  </header>
+
+  <main id="view-prepare" class="view">
+    <section class="stage" id="stage">
+      <canvas id="viewer"></canvas>
+      <div class="drop-hint" id="drop-hint">
+        <p data-i18n="stage.empty">Перетащите сюда модель (STL, 3MF, OBJ) или откройте её кнопкой</p>
+        <button id="open-models" class="primary" data-i18n="stage.open">Открыть модель</button>
+      </div>
+      <div class="models" id="models"></div>
+    </section>
+
+    <aside class="side">
+      <div id="novice" class="panel">
+        <section class="card" data-novice-item="filament">
+          <h3 data-i18n="novice.filament">Филамент</h3>
+          <div class="choices" id="filament"></div>
+          <p class="hint" id="filament-hint"></p>
+        </section>
+        <section class="card" data-novice-item="temperature">
+          <h3><span data-i18n="novice.temp">Поправка температуры</span> <b id="temp-value">0 °C</b></h3>
+          <input type="range" id="temp" min="-15" max="15" step="1" value="0">
+          <p class="hint" id="temp-hint" data-i18n="novice.tempHint">Если слои плохо слипаются - выше, если тянутся нитки - ниже.</p>
+        </section>
+        <section class="card" data-novice-item="supports">
+          <h3 data-i18n="novice.supports">Поддержки</h3>
+          <div class="choices" id="supports">
+            <button data-value="none" data-i18n="supports.none">Нет</button>
+            <button data-value="plate" data-i18n="supports.plate">Где нужно</button>
+            <button data-value="everywhere" data-i18n="supports.everywhere">Везде</button>
+          </div>
+          <p class="hint" id="supports-hint"></p>
+          <label class="check"><input type="checkbox" id="brim"> <span data-i18n="novice.brim">Кайма для прилипания</span></label>
+        </section>
+      </div>
+
+      <div id="advanced" class="panel" hidden>
+        <div class="adv-top">
+          <input type="search" id="adv-search" data-i18n-placeholder="adv.search" placeholder="Поиск настройки">
+          <button id="adv-reset" data-i18n="adv.reset">Сбросить правки</button>
+        </div>
+        <div class="adv-row">
+          <label><span data-i18n="adv.quality">Качество</span> <select id="adv-quality"></select></label>
+          <label><span data-i18n="adv.plate">Пластина</span> <select id="adv-plate"></select></label>
+        </div>
+        <div class="adv-tabs seg" id="adv-kind">
+          <button data-kind="process" class="active" data-i18n="adv.process">Печать</button>
+          <button data-kind="filament" data-i18n="adv.filament">Филамент</button>
+          <button data-kind="changed" data-i18n="adv.changed">Изменено</button>
+        </div>
+        <div class="adv-list" id="adv-list"></div>
+      </div>
+
+      <div class="actions">
+        <button id="slice" class="primary big" data-i18n="act.slice">Нарезать</button>
+        <div class="result" id="result" hidden>
+          <span id="res-time"></span><span id="res-weight"></span><span id="res-layers"></span>
+        </div>
+        <div class="row">
+          <button id="print" class="primary" disabled data-i18n="act.print">Печать</button>
+          <button id="export" disabled data-i18n="act.export">Экспорт на диск</button>
+        </div>
+        <div class="status" id="status" role="status"></div>
+        <ol class="steps" id="send-steps" hidden></ol>
+      </div>
+    </aside>
+  </main>
+
+  <main id="view-printer" class="view" hidden>
+    <section class="printer-head">
+      <label><span data-i18n="printer.address">Адрес принтера</span>
+        <input id="printer-host" data-i18n-placeholder="printer.auto" placeholder="найти в сети"></label>
+      <button id="printer-find" data-i18n="printer.find">Найти</button>
+      <button id="printer-connect" class="primary" data-i18n="printer.connect">Подключиться</button>
+      <label class="check"><input type="checkbox" id="bed-leveling"> <span data-i18n="printer.leveling">Калибровка стола перед печатью</span></label>
+      <span class="status" id="printer-conn"></span>
+    </section>
+    <div class="ai-alert" id="ai-alert" hidden>
+      <img id="ai-frame" alt="">
+      <div>
+        <b data-i18n="ai.title">ИИ видит брак</b>
+        <p id="ai-text"></p>
+        <button id="ai-pause" class="danger" data-i18n="ai.pause">Пауза</button>
+        <button id="ai-ok" data-i18n="ai.ok">Всё нормально</button>
+      </div>
+    </div>
+    <section class="printer-body">
+      <div class="camera"><img id="camera" alt=""><p class="hint" id="camera-hint" data-i18n="printer.noCamera">Камера появится после подключения</p></div>
+      <div class="pstate">
+        <h2 id="p-state">-</h2>
+        <p id="p-file"></p>
+        <div class="bar"><div id="p-bar"></div></div>
+        <dl>
+          <dt data-i18n="printer.layer">Слой</dt><dd id="p-layer">-</dd>
+          <dt data-i18n="printer.left">Осталось</dt><dd id="p-left">-</dd>
+          <dt data-i18n="printer.nozzle">Сопло</dt><dd id="p-nozzle">-</dd>
+          <dt data-i18n="printer.bed">Стол</dt><dd id="p-bed">-</dd>
+        </dl>
+        <div class="row">
+          <button id="p-pause" data-i18n="printer.pause">Пауза</button>
+          <button id="p-resume" data-i18n="printer.resume">Продолжить</button>
+          <button id="p-stop" class="danger" data-i18n="printer.stop">Отмена</button>
+        </div>
+        <p class="ai-state hint" id="ai-state"></p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="confirm"><p id="confirm-text"></p><div class="row"><button id="confirm-yes" class="danger"></button><button id="confirm-no"></button></div></dialog>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
