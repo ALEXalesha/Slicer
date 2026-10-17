@@ -111,7 +111,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 
 /* Управление принтером */
 #view-printer > * { min-width: 0; flex-shrink: 0; }
-#view-printer .printer-body { flex-shrink: 1; }
+#view-printer .printer-body { flex: 1 0 auto; min-height: 300px; }
 #view-printer .status, #view-printer p, #view-printer h2 { overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
 .printer-head .status { flex: 1 1 200px; }
 .pstate { min-width: 0; }
