@@ -26,6 +26,12 @@ const MUTANTS = [
   { name: 'job: tiny binary STL not marked', file: 'src/core/job.js', from: 'if (buf.length === 84 + count * 50 && looksAscii(buf)) markBinary(buf);', to: '', test: 'tests/core/engine.test.js' },
   { name: 'job: machine from User', file: 'src/core/job.js', from: "{ from: 'system' }", to: "{ from: 'User' }", test: 'tests/core/engine.test.js' },
   { name: 'aifp: answered alert shown', file: 'src/core/aifp.js', from: 'if (answered.has(a.id)) continue;', to: '', test: 'tests/core/aifp.test.js' },
+  { name: 'catalog: comma not turned into a dot', file: 'src/core/settings-catalog.js', from: "const v = s.replace(/,/g, '.')", to: 'const v = s', test: 'tests/core/settings-catalog.test.js' },
+  { name: 'catalog: range not checked', file: 'src/core/settings-catalog.js', from: "if (!inRange(n, ty.min, ty.max)) return fail('range');", to: '', test: 'tests/core/settings-catalog.test.js' },
+  { name: 'settings: invalid advanced value stored', file: 'src/core/settings.js', from: 'if (c.ok && c.value.length <= 500) out[k] = c.value;', to: 'out[k] = String(v);', test: 'tests/core/settings.test.js' },
+  { name: 'settings: old flat filament edits lost', file: 'src/core/settings.js', from: 'const old = cleanEdits(legacy);', to: 'const old = {};', test: 'tests/core/settings.test.js' },
+  { name: 'novice: filament edits shared by all filaments', file: 'src/core/novice.js', from: 'return plainObject(by[id]) || {};', to: 'return Object.assign({}, ...Object.values(by).filter(plainObject));', test: 'tests/core/novice.test.js' },
+  { name: 'engine: bad setting reported as failed', file: 'src/core/engine.js', from: "if (key) throw Object.assign(new EngineError('bad-setting', why), { key });", to: '', test: 'tests/core/engine.test.js' },
   { name: 'settings: any host accepted', file: 'src/core/settings.js', from: "if (s === '') return true;", to: 'return true;', test: 'tests/core/settings.test.js' },
 ];
 

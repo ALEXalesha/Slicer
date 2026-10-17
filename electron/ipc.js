@@ -9,6 +9,7 @@ const Settings = require('../src/core/settings');
 const { findEngine } = require('../src/core/engine-locate');
 const Presets = require('../src/core/presets');
 const Novice = require('../src/core/novice');
+const Catalog = require('../src/core/settings-catalog');
 const { prepareJob, MODEL_EXT } = require('../src/core/job');
 const { slice } = require('../src/core/engine');
 const { printerFileName } = require('../src/core/names');
@@ -51,7 +52,6 @@ function registerIpc(ctx) {
     return index;
   };
   let last = null;            // последняя нарезка: {gcodePath, info, modelName, filament}
-  let lastError = null;       // отказ последней нарезки: {code, key, detail} - «Продвинутый» показывает, какая настройка
   let sending = false;
 
   ipcMain.handle('settings:get', () => settings);
@@ -105,7 +105,6 @@ function registerIpc(ctx) {
   });
 
   ipcMain.handle('slice', async (_e, req) => {
-    lastError = null;
     const r = req && typeof req === 'object' ? req : {};
     const models = (Array.isArray(r.models) ? r.models : []).filter((m) => m && isModelPath(m.path))
       .map((m) => ({ path: m.path, name: typeof m.name === 'string' ? m.name : '' }));
@@ -129,11 +128,15 @@ function registerIpc(ctx) {
       const { settings: _s, ...short } = res.info;
       return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
     } catch (e) {
-      lastError = { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || ''), key: e.key || null };
-      return lastError;
+      // bad-setting: в detail сразу понятное «Высота слоя» (layer_height): причина движка.
+      const detail = String(e.detail || e.message || '');
+      if (e.code === 'bad-setting' && e.key) {
+        const label = Catalog.label(e.key, settings.lang) || e.key;
+        return { ok: false, code: 'bad-setting', key: e.key, detail: '«' + label + '» (' + e.key + '): ' + detail };
+      }
+      return { ok: false, code: e.code || 'failed', detail };
     }
   });
-  ipcMain.handle('slice:last-error', () => lastError);
 
   ipcMain.handle('export', async () => {
     if (!last || !fs.existsSync(last.gcodePath)) return { ok: false, code: 'no-gcode' };

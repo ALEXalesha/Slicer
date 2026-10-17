@@ -69,8 +69,7 @@ export const TEXT = {
     'adv.filHint': 'Правки филамента хранятся отдельно для каждого. Сейчас: {f}. Выбор общий с «Новичком».',
     'adv.otherFil': 'Правки есть и у других филаментов: {list}',
     'adv.notFound': 'Ничего не найдено', 'adv.changedN': 'изменено {n}',
-    'adv.engineBad': 'Эту настройку не принял движок при последней нарезке.',
-    'eng.bad-setting': 'Движок не принял настройку «{label}» ({key}): {why}. Исправьте её во вкладке «Продвинутый».',
+    'eng.bad-setting': 'Движок не принял настройку {why}. Исправьте её во вкладке «Продвинутый».',
   },
   en: {
     'tab.prepare': 'Prepare', 'tab.printer': 'Printer',
@@ -140,8 +139,7 @@ export const TEXT = {
     'adv.filHint': 'Filament changes are kept separately for each filament. Now: {f}. Shared with Beginner.',
     'adv.otherFil': 'Other filaments have changes too: {list}',
     'adv.notFound': 'Nothing found', 'adv.changedN': '{n} changed',
-    'adv.engineBad': 'The engine did not accept this setting in the last slice.',
-    'eng.bad-setting': 'The engine did not accept the setting "{label}" ({key}): {why}. Fix it on the Advanced tab.',
+    'eng.bad-setting': 'The engine did not accept the setting {why}. Fix it on the Advanced tab.',
   },
 };
 

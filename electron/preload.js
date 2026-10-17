@@ -17,7 +17,6 @@ contextBridge.exposeInMainWorld('slicer', {
   presetsInfo: call('presets:info'),
   presetsFull: call('presets:full'),
   slice: call('slice'),
-  sliceError: call('slice:last-error'),
   exportGcode: call('export'),
   print: call('print'),
   onSendStep: listen('send:step'),

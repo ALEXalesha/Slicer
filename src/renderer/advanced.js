@@ -19,7 +19,6 @@ let view = 'all';             // 'all' | 'changed'
 const open = new Set(['quality']);   // раскрытые разделы
 let openRow = '';             // строка с раскрытым описанием: 'process.layer_height'
 const bad = new Map();        // 'kind.key' -> введённый неверный текст (не сохранён)
-let badKey = '';              // настройка, которую не принял движок
 
 const lang = () => getLang();
 const show = (v) => (Array.isArray(v) ? String(v[0] ?? '') : String(v ?? ''));
@@ -145,7 +144,6 @@ function row(r) {
   const item = el('div', 'adv-item');
   item.classList.toggle('changed', r.changed);
   item.classList.toggle('open', openRow === id);
-  item.classList.toggle('engine-bad', badKey === r.key);
   item.classList.toggle('ro', C.isReadOnly(r.key));
   item.dataset.key = id;
   item.dataset.section = r.section;
@@ -175,10 +173,6 @@ function row(r) {
   if (bad.has(id)) {
     const res = C.check(r.key, bad.get(id), r.base);
     if (!res.ok) { item.classList.add('bad'); err.hidden = false; err.textContent = C.message(res.err, lang()); }
-  }
-  if (badKey === r.key) {
-    const p = el('p', 'adv-err', t('adv.engineBad'));
-    item.append(p);
   }
   return item;
 }
@@ -257,7 +251,6 @@ async function setEdit(r, value) {
   if (same) delete target[r.key];
   else target[r.key] = value;
   if (r.kind === 'filament' && !Object.keys(target).length) delete a.filament[id];
-  if (badKey === r.key) badKey = '';
   openRow = r.kind + '.' + r.key;
   await patchSettings({ advanced: a });
   document.dispatchEvent(new CustomEvent('slicer:advanced'));
@@ -313,24 +306,6 @@ function fillSelects() {
   p.value = s.plate;
 }
 
-// Движок не принял настройку: окно «Подготовки» пишет общее «не смог нарезать», а мы
-// уточняем, какая именно настройка и что сказал движок, и подсвечиваем её здесь.
-function watchStatus() {
-  const st = $('#status');
-  new MutationObserver(async () => {
-    if (!st.classList.contains('error') || st.textContent !== t('eng.failed') || !window.slicer.sliceError) return;
-    const e = await window.slicer.sliceError();
-    if (!e || e.code !== 'bad-setting' || !e.key) return;
-    badKey = e.key;
-    st.textContent = t('eng.bad-setting', { label: C.label(e.key, lang()) || e.key, key: e.key, why: e.detail || '' });
-    if (getSettings().mode === 'advanced') {
-      const sec = C.sectionOf(e.key);
-      open.add(sec);
-      render();
-    }
-  }).observe(st, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-}
-
 async function init() {
   window.__slicerInfo = window.__slicerInfo || await window.slicer.presetsInfo();
   fillSelects();
@@ -347,7 +322,6 @@ async function init() {
   $('#adv-plate').addEventListener('change', async (e) => { await patchSettings({ plate: e.target.value }); document.dispatchEvent(new CustomEvent('slicer:advanced')); load(); });
   $('#adv-reset').addEventListener('click', async () => {
     bad.clear();
-    badKey = '';
     await patchSettings({ advanced: { process: {}, filament: {} } });
     document.dispatchEvent(new CustomEvent('slicer:advanced'));
     render();
@@ -359,7 +333,6 @@ async function init() {
     if (!base || s.mode !== 'advanced') return;
     if (filId() !== loadedFor) { bad.clear(); load(); } else renderFilament();
   });
-  watchStatus();
   if (getSettings().mode === 'advanced') load();
 }
 
