@@ -2,17 +2,32 @@
 'use strict';
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const on = (channel) => (cb) => {
+const listen = (channel) => (cb) => {
   const h = (_e, data) => cb(data);
   ipcRenderer.on(channel, h);
   return () => ipcRenderer.removeListener(channel, h);
 };
+const call = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
 contextBridge.exposeInMainWorld('slicer', {
-  settings: {
-    get: () => ipcRenderer.invoke('settings:get'),
-    set: (patch) => ipcRenderer.invoke('settings:set', patch),
-  },
+  settings: { get: call('settings:get'), set: call('settings:set') },
   pathForFile: (file) => { try { return webUtils.getPathForFile(file) || ''; } catch { return ''; } },
-  on: { _: on },
+  openModels: call('models:open'),
+  readModel: call('models:read'),
+  presetsInfo: call('presets:info'),
+  presetsFull: call('presets:full'),
+  slice: call('slice'),
+  exportGcode: call('export'),
+  print: call('print'),
+  onSendStep: listen('send:step'),
+  printer: {
+    discover: call('printer:discover'),
+    connect: call('printer:connect'),
+    disconnect: call('printer:disconnect'),
+    command: call('printer:command'),
+    camera: call('printer:camera'),
+    onStatus: listen('printer:status'),
+    onLost: listen('printer:lost'),
+  },
+  ai: { poll: call('aifp:poll'), dismiss: call('aifp:dismiss') },
 });

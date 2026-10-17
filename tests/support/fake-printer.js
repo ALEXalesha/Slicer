@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const WebSocket = require('ws');
 
 const MAINBOARD = 'FAKE000000000000000000000000BEEF';
+const TINY_JPEG = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=', 'base64');
 
 function parseMultipart(body, contentType) {
   const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType || '');
@@ -61,6 +62,14 @@ async function startFakePrinter(opts = {}) {
   });
 
   const server = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/video') {
+      log.push({ http: 'video' });
+      res.writeHead(200, { 'Content-Type': 'multipart/x-mixed-replace; boundary=frame' });
+      res.write('--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ' + TINY_JPEG.length + '\r\n\r\n');
+      res.write(TINY_JPEG);
+      res.write('\r\n');
+      return;                                   // поток не закрываем, как настоящая камера
+    }
     const chunks = [];
     let dropped = false;
     req.on('data', (c) => {

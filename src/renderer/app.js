@@ -31,6 +31,7 @@ function showMode(mode) {
   for (const b of document.querySelectorAll('#mode button')) b.classList.toggle('active', b.dataset.mode === mode);
   $('#novice').hidden = mode !== 'novice';
   $('#advanced').hidden = mode !== 'advanced';
+  document.dispatchEvent(new CustomEvent('slicer:mode', { detail: mode }));
 }
 
 async function start() {
