@@ -3,6 +3,7 @@
 // Centauri Carbon 0.4 и 0.20mm Standard.
 'use strict';
 const { resolvePreset } = require('./presets');
+const Catalog = require('./settings-catalog');
 
 const MACHINE = 'Elegoo Centauri Carbon 0.4 nozzle';
 const PROCESS = '0.20mm Standard @Elegoo CC 0.4 nozzle';
@@ -112,8 +113,8 @@ function composeConfigs(index, { mode = 'novice', choice, advanced, quality, pla
   Object.assign(process, o.process);
   process.curr_bed_type = isAdv && PLATES.includes(plate) ? plate : PLATES[0];
   if (isAdv && advanced && typeof advanced === 'object') {
-    applyEdits(process, advanced.process);
-    applyEdits(filament, advanced.filament);
+    applyEdits(process, advanced.process, 'process');
+    applyEdits(filament, filamentEdits(advanced, c.filament), 'filament');
   }
   // У собранного пресета filament совместимость с этим принтером должна остаться: движок
   // отвергает пресет, если принтера нет в непустом compatible_printers.
@@ -121,11 +122,25 @@ function composeConfigs(index, { mode = 'novice', choice, advanced, quality, pla
 }
 
 const PROTECTED = new Set(['type', 'name', 'inherits', 'from', 'instantiation', 'compatible_printers', 'setting_id']);
+const plainObject = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
 
-function applyEdits(target, edits) {
+/** Правки «Продвинутого» для одного филамента: advanced.filament[<id>]. Чужие не участвуют. */
+function filamentEdits(advanced, id) {
+  const by = plainObject(advanced && advanced.filament) || {};
+  return plainObject(by[id]) || {};
+}
+
+// kind: 'process' | 'filament'. Ключ, которого нет в пресете, принимается только если каталог
+// знает его как ключ движка (extra): у филамента значения - массивы.
+function applyEdits(target, edits, kind) {
   if (!edits || typeof edits !== 'object') return;
   for (const [k, v] of Object.entries(edits)) {
-    if (PROTECTED.has(k) || !(k in target)) continue;
+    if (PROTECTED.has(k)) continue;
+    if (!(k in target)) {
+      if (!kind || !Catalog.isExtra(kind, k)) continue;
+      target[k] = kind === 'filament' ? [String(Array.isArray(v) ? v[0] : v)] : String(Array.isArray(v) ? v[0] : v);
+      continue;
+    }
     const old = target[k];
     if (Array.isArray(old)) target[k] = Array.isArray(v) ? v.map(String) : old.map(() => String(v));
     else target[k] = String(v);
@@ -135,5 +150,5 @@ function applyEdits(target, edits) {
 module.exports = {
   MACHINE, PROCESS, QUALITIES, PLATES, TEMP_LIMIT, FILAMENTS, SUPPORTS, NOVICE_ITEMS,
   FILAMENT_KEYS, PROCESS_KEYS, PETG_TESTED, PROTECTED,
-  normalizeChoice, noviceOverrides, composeConfigs, filamentInfo, applyEdits,
+  normalizeChoice, noviceOverrides, composeConfigs, filamentInfo, applyEdits, filamentEdits,
 };

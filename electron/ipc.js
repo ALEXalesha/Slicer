@@ -51,6 +51,7 @@ function registerIpc(ctx) {
     return index;
   };
   let last = null;            // последняя нарезка: {gcodePath, info, modelName, filament}
+  let lastError = null;       // отказ последней нарезки: {code, key, detail} - «Продвинутый» показывает, какая настройка
   let sending = false;
 
   ipcMain.handle('settings:get', () => settings);
@@ -104,6 +105,7 @@ function registerIpc(ctx) {
   });
 
   ipcMain.handle('slice', async (_e, req) => {
+    lastError = null;
     const r = req && typeof req === 'object' ? req : {};
     const models = (Array.isArray(r.models) ? r.models : []).filter((m) => m && isModelPath(m.path))
       .map((m) => ({ path: m.path, name: typeof m.name === 'string' ? m.name : '' }));
@@ -118,15 +120,20 @@ function registerIpc(ctx) {
       cleanJobs(root);
       const jobDir = path.join(root, 'job-' + Date.now());
       const job = prepareJob({ jobDir, models, configs });
-      const res = await slice({ exe: engine.exe, jobDir, ...job });
+      const keys = [...Object.keys(configs.process), ...Object.keys(configs.filament)];
+      const adv = settings.advanced;
+      const preferred = mode === 'advanced' ? [...Object.keys(adv.process), ...Object.keys(Novice.filamentEdits(adv, configs.choice.filament))] : [];
+      const res = await slice({ exe: engine.exe, jobDir, ...job, keys, preferred });
       const fil = Novice.filamentInfo(configs.choice.filament);
       last = { gcodePath: res.gcodePath, info: res.info, modelName: models[0].name || path.basename(models[0].path), filament: fil.label };
       const { settings: _s, ...short } = res.info;
       return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
     } catch (e) {
-      return { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || '') };
+      lastError = { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || ''), key: e.key || null };
+      return lastError;
     }
   });
+  ipcMain.handle('slice:last-error', () => lastError);
 
   ipcMain.handle('export', async () => {
     if (!last || !fs.existsSync(last.gcodePath)) return { ok: false, code: 'no-gcode' };

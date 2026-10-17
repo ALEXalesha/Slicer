@@ -64,6 +64,13 @@ export const TEXT = {
     'ai.off': 'ИИ-контроль брака (AiForPrinter) не запущен', 'ai.on': 'ИИ-контроль брака следит за печатью',
     'ai.offline': 'ИИ-контроль брака запущен, но не видит принтер',
     'time.h': '{h} ч {m} мин', 'time.m': '{m} мин',
+    // Продвинутый
+    'adv.all': 'Все настройки', 'adv.filFor': 'Филамент', 'adv.help': 'Что это за настройка',
+    'adv.filHint': 'Правки филамента хранятся отдельно для каждого. Сейчас: {f}. Выбор общий с «Новичком».',
+    'adv.otherFil': 'Правки есть и у других филаментов: {list}',
+    'adv.notFound': 'Ничего не найдено', 'adv.changedN': 'изменено {n}',
+    'adv.engineBad': 'Эту настройку не принял движок при последней нарезке.',
+    'eng.bad-setting': 'Движок не принял настройку «{label}» ({key}): {why}. Исправьте её во вкладке «Продвинутый».',
   },
   en: {
     'tab.prepare': 'Prepare', 'tab.printer': 'Printer',
@@ -128,6 +135,13 @@ export const TEXT = {
     'ai.off': 'AI defect watch (AiForPrinter) is not running', 'ai.on': 'AI defect watch is watching the print',
     'ai.offline': 'AI defect watch runs but does not see the printer',
     'time.h': '{h} h {m} min', 'time.m': '{m} min',
+    // Продвинутый
+    'adv.all': 'All settings', 'adv.filFor': 'Filament', 'adv.help': 'What is this setting',
+    'adv.filHint': 'Filament changes are kept separately for each filament. Now: {f}. Shared with Beginner.',
+    'adv.otherFil': 'Other filaments have changes too: {list}',
+    'adv.notFound': 'Nothing found', 'adv.changedN': '{n} changed',
+    'adv.engineBad': 'The engine did not accept this setting in the last slice.',
+    'eng.bad-setting': 'The engine did not accept the setting "{label}" ({key}): {why}. Fix it on the Advanced tab.',
   },
 };
 

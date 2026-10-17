@@ -76,9 +76,13 @@
           <label><span data-i18n="adv.quality">Качество</span> <select id="adv-quality"></select></label>
           <label><span data-i18n="adv.plate">Пластина</span> <select id="adv-plate"></select></label>
         </div>
+        <div class="adv-fil">
+          <span class="adv-fil-title" data-i18n="adv.filFor">Филамент</span>
+          <div class="choices" id="adv-filament"></div>
+          <p class="hint" id="adv-fil-hint"></p>
+        </div>
         <div class="adv-tabs seg" id="adv-kind">
-          <button data-kind="process" class="active" data-i18n="adv.process">Печать</button>
-          <button data-kind="filament" data-i18n="adv.filament">Филамент</button>
+          <button data-kind="all" class="active" data-i18n="adv.all">Все настройки</button>
           <button data-kind="changed" data-i18n="adv.changed">Изменено</button>
         </div>
         <div class="adv-list" id="adv-list"></div>

@@ -123,3 +123,38 @@ test('real engine: tiny binary STL with an empty header still loads (admesh woul
     assert.deepStrictEqual(fs.readFileSync(cube), fs.readFileSync(path.join(src, 'tiny' + size + '.stl')), 'source untouched');
   }
 });
+
+// А4: движок упал из-за значения настройки - человек видит, какой (код bad-setting с ключом),
+// а не «модель больше стола».
+test('fake engine: a bad value named in the engine log gives bad-setting with the key', async () => {
+  const src = tmp('slicer-src-');
+  const cube = writeCube(path.join(src, 'c.stl'), 20);
+  const jobDir = tmp('slicer-job-');
+  const configs = { machine: { name: 'M' }, process: { name: 'P', layer_height: '0.2' }, filament: { name: 'F' } };
+  const j = prepareJob({ jobDir, models: [{ path: cube }], configs });
+  process.env.FAKE_ENGINE = 'bad-setting';
+  try {
+    await assert.rejects(slice({ exe: FAKE, jobDir, ...j, keys: ['layer_height', 'wall_loops'] }),
+      (e) => e.code === 'bad-setting' && e.key === 'layer_height' && /Invalid value provided for parameter layer_height: abc/.test(e.detail));
+    await assert.rejects(slice({ exe: FAKE, jobDir, ...j }), (e) => e.code === 'failed');
+    process.env.FAKE_ENGINE = 'fail';
+    await assert.rejects(slice({ exe: FAKE, jobDir, ...j, keys: ['layer_height'] }), (e) => e.code === 'failed');
+  } finally { delete process.env.FAKE_ENGINE; }
+});
+
+test('real engine: bad values are reported as bad-setting, a big model is not', { skip: noEngine }, async () => {
+  const src = tmp('slicer-src-');
+  const cube = writeCube(path.join(src, 'c.stl'), 20);
+  const run = async (model, processEdit) => {
+    const jobDir = tmp('slicer-job-');
+    const configs = N.composeConfigs(idx(), { choice: { filament: 'pla' } });
+    Object.assign(configs.process, processEdit);
+    const j = prepareJob({ jobDir, models: [{ path: model }], configs });
+    const keys = [...Object.keys(configs.process), ...Object.keys(configs.filament)];
+    return slice({ exe: engine.exe, jobDir, ...j, keys, preferred: Object.keys(processEdit) });
+  };
+  await assert.rejects(run(cube, { layer_height: 'abc' }), (e) => e.code === 'bad-setting' && e.key === 'layer_height');
+  await assert.rejects(run(cube, { layer_height: '5' }), (e) => e.code === 'bad-setting' && e.key === 'layer_height');
+  const big = writeCube(path.join(src, 'big.stl'), 300);
+  await assert.rejects(run(big, {}), (e) => (e.code === 'failed' || e.code === 'empty') && !e.key);
+});
