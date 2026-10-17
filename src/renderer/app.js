@@ -55,7 +55,7 @@ async function start() {
     b.addEventListener('click', () => { showMode(b.dataset.mode); patchSettings({ mode: b.dataset.mode }); });
   }
   for (const cb of listeners) cb(settings);
-  const parts = await Promise.allSettled([import('./prepare.js'), import('./printer-panel.js')]);
+  const parts = await Promise.allSettled([import('./prepare.js'), import('./printer-panel.js'), import('./advanced.js')]);
   for (const p of parts) if (p.status === 'rejected') console.error(p.reason);
   ready = true;
 }

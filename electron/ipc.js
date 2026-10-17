@@ -91,13 +91,16 @@ function registerIpc(ctx) {
     return { engine: !!idx, filaments, qualities: Novice.QUALITIES, plates: Novice.PLATES, tempLimit: Novice.TEMP_LIMIT };
   });
 
+  // База «Продвинутого»: собранные пресеты с выбором «Новичка», качеством и пластиной, без правок.
   ipcMain.handle('presets:full', (_e, req) => {
-    const idx = getIndex();
+    let idx;
+    try { idx = getIndex(); } catch { idx = null; }
     if (!idx) return null;
     const r = req && typeof req === 'object' ? req : {};
-    const c = Novice.composeConfigs(idx, { mode: 'novice', choice: r.choice || settings.choice, quality: r.quality, plate: r.plate });
-    const base = Novice.composeConfigs(idx, { mode: 'advanced', choice: r.choice || settings.choice, quality: r.quality || settings.quality, plate: r.plate || settings.plate });
-    return { process: base.process, filament: base.filament, novice: { process: c.process, filament: c.filament } };
+    const quality = Novice.QUALITIES.includes(r.quality) ? r.quality : settings.quality;
+    const plate = Novice.PLATES.includes(r.plate) ? r.plate : settings.plate;
+    const c = Novice.composeConfigs(idx, { mode: 'advanced', choice: r.choice || settings.choice, quality, plate });
+    return { process: c.process, filament: c.filament };
   });
 
   ipcMain.handle('slice', async (_e, req) => {
