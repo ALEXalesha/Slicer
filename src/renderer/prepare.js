@@ -2,6 +2,7 @@
 import { t, formatTime } from './i18n.js';
 import { onSettings, getSettings, patchSettings } from './app.js';
 import { Viewer } from './viewer.js';
+import { confirmHost } from './ask.js';
 
 const $ = (s) => document.querySelector(s);
 const S = window.slicer;
@@ -169,6 +170,7 @@ function sendError(r) {
     case 'size-mismatch': return t('send.size-mismatch', { got: r.got, want: r.want, n });
     case 'start-rejected': return t('send.start-rejected', { ack: r.ack, why: t(['1', '2', '3', '4', '5', '6', '7'].includes(String(r.ack)) ? 'ack.' + r.ack : 'ack.x') });
     case 'not-started': return t('send.not-started');
+    case 'host-canceled': return t('send.hostCanceled');
     default: return t('send.offline');
   }
 }
@@ -186,7 +188,13 @@ async function doPrint() {
     markStep(ol, s.step, extra);
   });
   try {
-    const r = await S.print({ start: true });
+    let r = await S.print({ start: true });
+    // Адрес не задан: главный процесс не печатает на первый найденный молча, а спрашивает.
+    if (r.code === 'confirm-host') {
+      const host = await confirmHost(r.found);
+      if (host) { await patchSettings({ printerHost: host }); r = await S.print({ start: true }); }
+      else r = { ok: false, code: 'host-canceled' };
+    }
     if (r.ok) {
       for (const li of ol.children) li.className = 'done';
       setStatus(t('send.ok', { name: r.name }), 'ok');
