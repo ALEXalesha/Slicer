@@ -13,7 +13,8 @@
     "test": "node --test --test-concurrency=1 \"tests/core/*.test.js\"",
     "test:app": "playwright test --config=playwright.app.config.js --workers=1",
     "mutate": "node tools/mutate.js",
-    "dist": "electron-builder --win portable nsis --x64"
+    "dist": "electron-builder --win portable nsis --x64",
+    "icon": "node tools/make-icon.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
@@ -29,15 +30,42 @@
     "appId": "com.alexalesha.slicercc",
     "productName": "Slicer CC",
     "copyright": "Copyright (c) 2026 ALEXalesha",
-    "directories": { "output": "dist" },
-    "files": ["electron/**", "src/**", "assets/icon.ico", "assets/icon.png", "LICENSE", "!**/*.map"],
-    "electronLanguages": ["en-US", "ru"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "src/**",
+      "assets/icon.ico",
+      "assets/icon.png",
+      "LICENSE",
+      "!**/*.map"
+    ],
+    "electronLanguages": [
+      "en-US",
+      "ru"
+    ],
     "compression": "maximum",
     "win": {
       "icon": "assets/icon.ico",
-      "target": [{ "target": "portable", "arch": ["x64"] }, { "target": "nsis", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
-    "portable": { "artifactName": "SlicerCC-${version}-Portable.${ext}" },
+    "portable": {
+      "artifactName": "SlicerCC-${version}-Portable.${ext}"
+    },
     "nsis": {
       "artifactName": "SlicerCC-${version}-Setup.${ext}",
       "oneClick": false,
