@@ -11,6 +11,15 @@
 
 [English](README.md)
 
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+Код, тесты и документация этого проекта написаны Claude (Anthropic) в Claude Code. Идеи, проверка и решения - Алексей.
+
+**Состояние: ещё не выпущена.** Версия 0.2.0 ждёт проверки Алексея на настоящем принтере, поэтому установщика и выпуска
+на GitHub пока нет. Попробовать из исходников: `npm install`, потом `npm start`. Движок нарезки - ElegooSlicer, установленный
+в Program Files (или путь к его `elegoo-slicer.exe` в переменной `SLICER_ENGINE`).
+
+<img src="docs/screenshots/beginner-ru.png" width="49%" alt="Режим «Новичок»: две модели на столе, панель «Перемещение», справа филамент, температура и поддержки"> <img src="docs/screenshots/layers-ru.png" width="49%" alt="После нарезки: ползунок слоёв, легенда по типам линий с долей времени, время, вес и кнопка «Печать»">
+
 ## Почему так
 
 Две жалобы, с которых всё началось: в Orca «очень много настроек, глаза разбегаются», и файлы из слайсера «криво

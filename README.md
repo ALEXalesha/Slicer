@@ -11,6 +11,15 @@ the program adds two things Elegoo Slicer lacks:
 
 [Русский](README.ru.md)
 
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+Code, tests and docs are written by Claude (Anthropic) in Claude Code. Ideas, testing and decisions - Alexey.
+
+**Status: not released yet.** Version 0.2.0 waits for Alexey's check on a real printer, so there is no installer or
+GitHub release yet. To try it from source: `npm install`, then `npm start`. The slicing engine is ElegooSlicer, installed
+in Program Files (or set `SLICER_ENGINE` to its `elegoo-slicer.exe`).
+
+<img src="docs/screenshots/beginner-en.png" width="49%" alt="Beginner mode: two models on the plate, the Move panel, filament, temperature and supports on the right"> <img src="docs/screenshots/layers-en.png" width="49%" alt="After slicing: layer slider, legend by line type with time share, time, weight and the Print button">
+
 ## Found by measurement (2026-10-17, ElegooSlicer 1.5.3.5)
 
 | What | Before | Done |
