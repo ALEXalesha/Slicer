@@ -1,4 +1,4 @@
-// Поддельный движок: ведёт себя по FAKE_ENGINE (ok | fail | empty | hang | bad-setting).
+// Поддельный движок: ведёт себя по FAKE_ENGINE (ok | slow | fail | empty | hang | bad-setting).
 // bad-setting - как настоящий движок с неверным значением: причина в журнале 00000.log.
 'use strict';
 const fs = require('fs');
@@ -6,6 +6,8 @@ const path = require('path');
 const mode = process.env.FAKE_ENGINE || 'ok';
 const args = process.argv.slice(2);
 const out = args[args.indexOf('--outputdir') + 1];
+// slow - как ok, но через 3 с: для законов «поменяли во время нарезки».
+if (mode === 'slow') { const t = Date.now() + 3000; while (Date.now() < t) { /* ждём */ } }
 if (mode === 'bad-setting') {
   fs.writeFileSync('00000.log', 'Slic3r::ConfigBase::load_from_json: parse process.json got a generic exception, reason = Invalid value provided for parameter ' +
     (process.env.FAKE_BAD_KEY || 'layer_height') + ': abc\nSlic3r::CLI::run: Can not load config from file process.json\n');

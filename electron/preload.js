@@ -13,7 +13,6 @@ contextBridge.exposeInMainWorld('slicer', {
   settings: { get: call('settings:get'), set: call('settings:set') },
   pathForFile: (file) => { try { return webUtils.getPathForFile(file) || ''; } catch { return ''; } },
   openModels: call('models:open'),
-  readModel: call('models:read'),
   loadModel: call('models:load'),
   preview: call('preview'),
   presetsInfo: call('presets:info'),

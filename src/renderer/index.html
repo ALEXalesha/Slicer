@@ -41,6 +41,30 @@
         <button id="open-models" class="primary" data-i18n="stage.open">Открыть модель</button>
       </div>
       <div class="models" id="models"></div>
+      <div class="view-switch seg" id="view-switch">
+        <button data-show="models" class="active" data-i18n="view.models">Модели</button>
+        <button data-show="layers" id="show-layers" disabled data-i18n="view.layers">Слои</button>
+      </div>
+      <button class="fit-view icon-btn" id="fit-view" data-i18n-title="view.fit" title="Показать весь стол">⤢</button>
+      <nav class="toolbar" id="toolbar" hidden>
+        <button data-tool="move" class="active"></button>
+        <button data-tool="rotate"></button>
+        <button data-tool="scale"></button>
+        <button data-tool="face"></button>
+        <button data-tool="cut"></button>
+        <button data-tool="paint"></button>
+        <span class="sep"></span>
+        <button data-act="arrange"></button>
+        <button data-act="copy"></button>
+        <button data-act="delete"></button>
+      </nav>
+      <div class="tool-panel" id="tool-panel" hidden></div>
+      <div class="legend" id="legend" hidden></div>
+      <div class="layers" id="layers" hidden>
+        <span class="layer-label" id="layer-label"></span>
+        <input type="range" id="layer-top" min="1" max="1" value="1" aria-label="layer">
+        <label class="check"><input type="checkbox" id="layer-only"> <span data-i18n="pv.only">Только этот слой</span></label>
+      </div>
     </section>
 
     <aside class="side">

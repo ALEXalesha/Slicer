@@ -83,6 +83,7 @@ test('engine failure gives a human message, not a code', async () => {
 });
 
 test('print to the fake printer: steps up to started; hidden file gives a clear message', async () => {
+  test.setTimeout(300000);
   test.skip(!engine, 'needs the real profiles');
   const env = { SLICER_ENGINE: FAKE_ENGINE, SLICER_PROFILES: engine.profilesDir, FAKE_ENGINE: 'ok' };
   const fake = await startFakePrinter();
@@ -95,6 +96,12 @@ test('print to the fake printer: steps up to started; hidden file gives a clear 
     await win.click('#print');
     await expect(win.locator('#status')).toContainText('Печать началась', { timeout: 30000 });
     await expect(win.locator('#send-steps li.done')).toHaveCount(6);
+    // шаги переводятся при смене языка (ревьювер Б1) и уходят, когда нарезка устарела (Б5)
+    await win.selectOption('#lang', 'en');
+    await expect(win.locator('#send-steps li').first()).toHaveText('Connecting to the printer');
+    await win.selectOption('#lang', 'ru');
+    await win.click('#supports button[data-value="plate"]');
+    await expect(win.locator('#send-steps')).toBeHidden();
     expect(fake.commands(128)).toHaveLength(1);
     expect([...fake.state.files.keys()][0]).toMatch(/^\/local\/Kubik_PLA_\d+m\.gcode$/);
   } finally { await app.close(); await fake.close(); }

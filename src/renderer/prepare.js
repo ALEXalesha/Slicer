@@ -1,68 +1,103 @@
-// Раздел «Подготовка»: модели на столе, три выбора «Новичка», нарезка, экспорт, печать.
+// Раздел «Подготовка»: модели на столе (редактор - editor.js), три выбора «Новичка»,
+// нарезка, слои (preview.js), экспорт, печать.
 import { t, formatTime } from './i18n.js';
 import { onSettings, getSettings, patchSettings } from './app.js';
-import { Viewer } from './viewer.js';
+import { Editor } from './editor.js';
+import { Preview } from './preview.js';
 import { confirmHost } from './ask.js';
 
 const $ = (s) => document.querySelector(s);
 const S = window.slicer;
-const viewer = new Viewer($('#viewer'));
-const models = [];           // {path, name, object}
 let info = null;             // presets:info
 let choice = { filament: 'pla', tempDelta: 0, supports: 'none', brim: false };
 let sliced = null;           // результат последней нарезки
 let busy = false;
+let gen = 0;                 // поколение стола и выборов: нарезка, начатая до изменения, устарела (ревьювер А2)
+let status = { key: '', vars: {}, kind: '' };
+let sendState = null;        // {step, extra, done, fail}
 
-function setStatus(text, kind = '') {
+const editor = new Editor({ onChange: () => { invalidate(); renderModels(); }, onStatus: (key, vars, kind) => setStatus(key, vars, kind) });
+editor.supportsNone = () => choice.supports === 'none';
+const preview = new Preview(editor.scene);
+
+// Статус хранится ключом и параметрами: при смене языка перерисовывается (ревьювер Б1).
+function setStatus(key, vars = {}, kind = '') {
+  status = { key, vars, kind };
+  drawStatus();
+}
+
+function drawStatus() {
   const el = $('#status');
-  el.textContent = text || '';
+  const { key, vars, kind } = status;
+  el.textContent = key ? (key === '=' ? vars.text : t(key, vars)) : '';
+  el.title = vars && vars.title ? vars.title : el.textContent;
   el.className = 'status' + (kind ? ' ' + kind : '');
 }
 
 function invalidate() {
-  if (sliced && $('#status').classList.contains('ok')) setStatus('');
+  gen++;
+  if (sliced && status.kind === 'ok') setStatus('');
   sliced = null;
   $('#result').hidden = true;
   $('#print').disabled = true;
   $('#export').disabled = true;
+  $('#send-steps').hidden = true;          // старый список шагов печати не висит (ревьювер Б5)
+  sendState = null;
+  $('#show-layers').disabled = true;
+  preview.clear();
+  showStage('models');
+}
+
+function showStage(mode) {
+  for (const b of document.querySelectorAll('#view-switch button')) b.classList.toggle('active', b.dataset.show === mode);
+  editor.scene.setMode(mode);
+  $('#legend').hidden = mode !== 'layers';
+  $('#layers').hidden = mode !== 'layers';
+  $('#models').hidden = mode !== 'models';
+  $('#drop-hint').hidden = mode !== 'models';
+  $('#show-layers').title = $('#show-layers').disabled ? t('view.needSlice') : '';
+  editor.refreshPanel();
 }
 
 function renderModels() {
   const box = $('#models');
   box.textContent = '';
-  for (const [i, m] of models.entries()) {
+  const states = editor.states();
+  for (const s of states) {
     const chip = document.createElement('div');
-    chip.className = 'chip';
+    chip.className = 'chip' + (s.selected ? ' selected' : '') + (s.off ? ' off' : '');
+    chip.dataset.uid = String(s.uid);
     const name = document.createElement('span');
-    name.textContent = m.name;
-    name.title = m.name;
+    name.textContent = s.name;
+    name.title = s.name;                    // полное имя - в подсказке (пункт 9)
+    name.addEventListener('click', (e) => editor.select(editor.items.find((i) => i.uid === s.uid), e.ctrlKey || e.shiftKey));
     const rm = document.createElement('button');
     rm.textContent = '×';
     rm.title = t('stage.remove');
-    rm.dataset.remove = String(i);
-    rm.addEventListener('click', () => { models.splice(i, 1); renderModels(); invalidate(); });
+    rm.dataset.remove = String(s.uid);
+    rm.addEventListener('click', () => editor.remove([editor.items.find((i) => i.uid === s.uid)]));
     chip.append(name, rm);
     box.append(chip);
   }
-  $('#drop-hint').classList.toggle('has-models', models.length > 0);
-  $('#open-models').textContent = models.length ? t('stage.add') : t('stage.open');
-  viewer.setModels(models.map((m) => m.object).filter(Boolean));
+  $('#drop-hint').classList.toggle('has-models', states.length > 0);
+  $('#open-models').textContent = states.length ? t('stage.add') : t('stage.open');
+  $('#toolbar').hidden = !states.length || editor.scene.mode !== 'models';
 }
+editor.onSelect = renderModels;
 
 async function addModels(paths) {
   for (const p of paths) {
-    if (!p || models.some((m) => m.path === p)) continue;
+    if (!p) continue;
     const name = p.split(/[\\/]/).pop();
-    const buf = await S.readModel(p);
-    if (!buf) { setStatus(t('stage.badFile', { name, why: '?' }), 'error'); continue; }
-    let object = null;
-    try { object = Viewer.parse(name, buf); } catch (e) {
-      if (viewer.ok) { setStatus(t('stage.badFile', { name, why: e.message }), 'error'); continue; }
-    }
-    models.push({ path: p, name, object });
+    setStatus('stage.loading', { name });
+    const r = await S.loadModel(p);
+    if (!r || !r.ok) { setStatus('stage.badFile', { name, why: t('mesh.' + ((r && r.code) || 'bad-path')) }, 'error'); continue; }
+    editor.add(r.objects, name);
+    const warn = (r.warnings || []).filter((w) => w.startsWith('warn') || ['modifier_part', 'negative_part', 'support_enforcer', 'support_blocker', 'not-printable', 'missing-object'].includes(w));
+    if (warn.length) setStatus('stage.warn', { name, what: warn.map((w) => t('warn.' + w)).join(', ') });
+    else setStatus('');
   }
   renderModels();
-  invalidate();
 }
 
 function renderChoice() {
@@ -84,6 +119,7 @@ function setChoice(patch) {
   choice = Object.assign({}, choice, patch);
   renderChoice();
   invalidate();
+  editor.refreshPanel();
   patchSettings({ choice });
 }
 
@@ -99,30 +135,44 @@ function buildFilaments() {
   }
 }
 
-const ENGINE_CODES = ['not-found', 'failed', 'timeout', 'empty', 'bad-setting'];
+const ENGINE_CODES = ['not-found', 'failed', 'timeout', 'empty', 'bad-setting', 'plates', 'too-big', 'too-many', 'bad-model'];
+
+function renderResult() {
+  if (!sliced) return;
+  $('#res-time').textContent = t('res.time', { t: formatTime(sliced.info.timeSec) });
+  $('#res-weight').textContent = sliced.info.filamentG ? t('res.weight', { g: Math.round(sliced.info.filamentG * 10) / 10 }) : '';
+  $('#res-layers').textContent = t('res.layers', { n: sliced.info.layers });
+}
 
 async function doSlice() {
   if (busy) return;
-  if (!models.length) { setStatus(t('act.needModel'), 'error'); return; }
+  if (!editor.items.length) { setStatus('act.needModel', {}, 'error'); return; }
   busy = true;
   invalidate();
+  const my = gen;
   $('#slice').disabled = true;
-  setStatus(t('act.slicing'));
+  setStatus('act.slicing');
   try {
-    const r = await S.slice({ models: models.map((m) => ({ path: m.path, name: m.name })), mode: document.querySelector('#mode button.active').dataset.mode, choice });
+    const r = await S.slice({ objects: editor.forSlice(), mode: document.querySelector('#mode button.active').dataset.mode, choice });
+    if (my !== gen) { setStatus('act.stale', {}, 'error'); return; }
     if (!r.ok) {
-      const key = ENGINE_CODES.includes(r.code) ? 'eng.' + r.code : r.code === 'preset' ? 'eng.preset' : r.code === 'no-models' ? 'act.needModel' : 'eng.failed';
-      setStatus(t(key, { why: r.detail || '' }), 'error');
+      if (r.code === 'off-bed') setStatus('eng.off-bed', { names: (r.names || []).join(', ') }, 'error');
+      else if (r.code === 'no-models') setStatus('act.needModel', {}, 'error');
+      else if (r.code === 'preset') setStatus('eng.preset', { why: r.detail || '' }, 'error');
+      else setStatus(ENGINE_CODES.includes(r.code) ? 'eng.' + r.code : 'eng.failed', { why: r.detail || '' }, 'error');
       return;
     }
     sliced = r;
-    $('#res-time').textContent = t('res.time', { t: formatTime(r.info.timeSec) });
-    $('#res-weight').textContent = r.info.filamentG ? t('res.weight', { g: Math.round(r.info.filamentG * 10) / 10 }) : '';
-    $('#res-layers').textContent = t('res.layers', { n: r.info.layers });
+    renderResult();
     $('#result').hidden = false;
     $('#print').disabled = false;
     $('#export').disabled = false;
-    setStatus(r.name, 'ok');
+    setStatus('=', { text: r.name }, 'ok');
+    const p = await S.preview();
+    if (my !== gen || !p || !p.ok) return;
+    preview.set(p.preview);
+    $('#show-layers').disabled = false;
+    showStage('layers');
   } finally {
     busy = false;
     $('#slice').disabled = false;
@@ -131,32 +181,25 @@ async function doSlice() {
 
 async function doExport() {
   const r = await S.exportGcode();
-  if (r.ok) setStatus(t('exp.saved', { path: r.path }), 'ok');
+  if (r.ok) setStatus('exp.saved', { path: r.path.split(/[\\/]/).pop(), title: r.path }, 'ok');     // путь целиком - в подсказке (ревьювер Б2)
 }
 
 const STEPS = ['connect', 'check-idle', 'upload', 'verify', 'start', 'started'];
 
-function stepList() {
+function drawSteps() {
   const ol = $('#send-steps');
   ol.textContent = '';
+  if (!sendState) { ol.hidden = true; return; }
+  ol.hidden = false;
+  const i = STEPS.indexOf(sendState.step);
   for (const s of STEPS) {
     const li = document.createElement('li');
     li.dataset.step = s;
-    li.textContent = t('send.' + s);
+    const j = STEPS.indexOf(s);
+    li.textContent = t('send.' + s) + (s === sendState.step && sendState.extra ? ' ' + sendState.extra : '');
+    li.className = sendState.done ? 'done' : j < i ? 'done' : j === i ? (sendState.fail ? 'fail' : 'now') : '';
     ol.append(li);
   }
-  ol.hidden = false;
-  return ol;
-}
-
-function markStep(ol, step, extra) {
-  const i = STEPS.indexOf(step);
-  for (const li of ol.children) {
-    const j = STEPS.indexOf(li.dataset.step);
-    li.className = j < i ? 'done' : j === i ? 'now' : '';
-  }
-  const li = ol.querySelector(`[data-step="${step}"]`);
-  if (li && extra) li.textContent = t('send.' + step) + ' ' + extra;
 }
 
 function sendError(r) {
@@ -181,28 +224,30 @@ async function doPrint() {
   $('#print').disabled = true;
   $('#slice').disabled = true;
   setStatus('');
-  const ol = stepList();
+  sendState = { step: 'connect', extra: '' };
+  drawSteps();
   const off = S.onSendStep((s) => {
     let extra = '';
     if (s.step === 'upload' && s.total) extra = Math.floor((s.sent / s.total) * 100) + ' %' + (s.attempt > 1 ? ', ' + t('send.retry', { n: s.attempt, max: s.attempts }) : '');
-    markStep(ol, s.step, extra);
+    sendState = { step: s.step, extra };
+    drawSteps();
   });
   try {
     let r = await S.print({ start: true });
     // Адрес не задан: главный процесс не печатает на первый найденный молча, а спрашивает.
     if (r.code === 'confirm-host') {
       const host = await confirmHost(r.found);
-      if (host) { await patchSettings({ printerHost: host }); r = await S.print({ start: true }); }
-      else r = { ok: false, code: 'host-canceled' };
+      if (host) { await patchSettings({ printerHost: host }); r = await S.print({ start: true }); } else r = { ok: false, code: 'host-canceled' };
     }
     if (r.ok) {
-      for (const li of ol.children) li.className = 'done';
-      setStatus(t('send.ok', { name: r.name }), 'ok');
+      sendState = { step: 'started', extra: '', done: true };
+      setStatus('send.ok', { name: r.name }, 'ok');
     } else {
-      const now = ol.querySelector('.now');
-      if (now) now.className = 'fail';
-      setStatus(sendError(r), 'error');
+      if (sendState) sendState.fail = true;
+      setStatus('=', { text: sendError(r) }, 'error');
+      status.retext = () => sendError(r);
     }
+    drawSteps();
   } finally {
     off();
     busy = false;
@@ -226,6 +271,18 @@ function wireDrop() {
   document.addEventListener('drop', (e) => e.preventDefault());
 }
 
+function onLang() {
+  renderChoice();
+  renderModels();
+  renderResult();
+  if (status.retext) status.vars.text = status.retext();
+  drawStatus();
+  drawSteps();
+  editor.texts();
+  preview.texts();
+  $('#fit-view').title = t('view.fit');
+}
+
 async function init() {
   info = await S.presetsInfo();
   buildFilaments();
@@ -233,7 +290,7 @@ async function init() {
   if (saved) choice = Object.assign(choice, saved);
   if (!info.filaments.some((f) => f.id === choice.filament)) choice.filament = 'pla';
   renderChoice();
-  if (!info.engine) setStatus(t('eng.not-found'), 'error');
+  if (!info.engine) setStatus('eng.not-found', {}, 'error');
   $('#temp').addEventListener('input', (e) => setChoice({ tempDelta: Number(e.target.value) }));
   for (const b of document.querySelectorAll('#supports button')) b.addEventListener('click', () => setChoice({ supports: b.dataset.value }));
   $('#brim').addEventListener('change', (e) => setChoice({ brim: e.target.checked }));
@@ -241,12 +298,28 @@ async function init() {
   $('#slice').addEventListener('click', doSlice);
   $('#export').addEventListener('click', doExport);
   $('#print').addEventListener('click', doPrint);
+  for (const b of document.querySelectorAll('#view-switch button')) b.addEventListener('click', () => { if (!b.disabled) showStage(b.dataset.show); });
+  $('#fit-view').addEventListener('click', () => editor.scene.fitView());
+  $('#fit-view').title = t('view.fit');
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Delete' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !$('#view-prepare').hidden) editor.remove();
+  });
+  const theme = () => editor.scene.setTheme(document.documentElement.dataset.theme === 'light');
+  new MutationObserver(theme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  theme();
   wireDrop();
-  document.addEventListener('slicer:lang', () => { renderChoice(); renderModels(); });
+  document.addEventListener('slicer:lang', onLang);
   document.addEventListener('slicer:mode', invalidate);
   document.addEventListener('slicer:advanced', invalidate);
+  document.addEventListener('slicer:choice', (e) => { if (e.detail) { choice = Object.assign({}, choice, e.detail); renderChoice(); invalidate(); } });
   onSettings(() => {});
+  showStage('models');
 }
 
 await init();
-window.slicerPrepare = { addModels, models: () => models.map((m) => m.name), choice: () => choice };
+window.slicerPrepare = {
+  addModels, editor, preview,
+  models: () => editor.items.map((m) => m.name),
+  choice: () => choice,
+  gen: () => gen,
+};

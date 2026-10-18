@@ -140,12 +140,6 @@ function registerIpc(ctx) {
     return (r.filePaths || []).filter(isModelPath);
   });
 
-  ipcMain.handle('models:read', (_e, p) => {
-    if (!isModelPath(p)) return null;
-    const b = fs.readFileSync(p);
-    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
-  });
-
   ipcMain.handle('models:load', async (_e, p) => {
     if (!isModelPath(p)) return { ok: false, code: 'bad-path' };
     const r = await runWorker('model', p);
@@ -187,45 +181,8 @@ function registerIpc(ctx) {
     return { process: c.process, filament: c.filament };
   });
 
-  async function sliceFiles(r) {
-    const models = r.models.filter((m) => m && isModelPath(m.path))
-      .map((m) => ({ path: m.path, name: typeof m.name === 'string' ? m.name : '' }));
-    if (!models.length) return { ok: false, code: 'no-models' };
-    let idx;
-    try { idx = getIndex(); } catch (e) { return { ok: false, code: 'preset', detail: e.message }; }
-    if (!idx) return { ok: false, code: 'not-found' };
-    try {
-      const mode = r.mode === 'advanced' ? 'advanced' : 'novice';
-      const configs = Novice.composeConfigs(idx, { mode, choice: r.choice, advanced: settings.advanced, quality: settings.quality, plate: settings.plate });
-      const root = jobsRoot();
-      cleanJobs(root);
-      const jobDir = path.join(root, 'job-' + Date.now());
-      const job = prepareJob({ jobDir, models, configs });
-      const keys = [...Object.keys(configs.process), ...Object.keys(configs.filament)];
-      const adv = settings.advanced;
-      const preferred = mode === 'advanced' ? [...Object.keys(adv.process), ...Object.keys(Novice.filamentEdits(adv, configs.choice.filament))] : [];
-      last = null;
-      const res = await slice({ exe: engine.exe, jobDir, ...job, keys, preferred });
-      const fil = Novice.filamentInfo(configs.choice.filament);
-      last = { gcodePath: res.gcodePath, info: res.info, modelName: models[0].name || path.basename(models[0].path), filament: fil.label };
-      const { settings: _s, ...short } = res.info;
-      return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
-    } catch (e) {
-      // bad-setting: в detail сразу понятное «Высота слоя» (layer_height): причина движка.
-      const detail = String(e.detail || e.message || '');
-      if (e.code === 'bad-setting' && e.key) {
-        const label = Catalog.label(e.key, settings.lang) || e.key;
-        return { ok: false, code: 'bad-setting', key: e.key, detail: '«' + label + '» (' + e.key + '): ' + detail };
-      }
-      return { ok: false, code: e.code || 'failed', detail };
-    }
-  }
-
   ipcMain.handle('slice', async (_e, req) => {
     const r = req && typeof req === 'object' ? req : {};
-    // Старый путь (окно 0.1.0 шлёт пути файлов): движок сам расставляет. Уйдёт, когда окно
-    // перейдёт на модели стола (objects).
-    if (!r.objects && Array.isArray(r.models)) return sliceFiles(r);
     const plate = checkPlate(r.objects);
     if (plate.error) return plate.error;
     let idx;

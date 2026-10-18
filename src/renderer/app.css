@@ -52,6 +52,79 @@ button.big { width: 100%; padding: 12px; font-size: 16px; }
   background: var(--glass-bg-strong); border: 1px solid var(--glass-border); }
 .models .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .models .chip button { padding: 2px 8px; }
+/* Имена не вылезают за край: одна строка с «…», полное имя - в title (пункт 9 Алексея). */
+.models[hidden], .drop-hint[hidden] { display: none; }
+.models .chip { max-width: 100%; min-width: 0; cursor: default; }
+.models .chip span { min-width: 0; flex: 1; cursor: pointer; }
+.models .chip.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.models .chip.off { border-color: var(--danger); }
+.models .chip.off span { color: var(--danger); }
+.status { overflow-wrap: anywhere; min-width: 0; }
+
+/* Редактор моделей и слои (0.2) */
+.view-switch { position: absolute; top: 12px; right: 12px; }
+.view-switch button { padding: 5px 12px; }
+.icon-btn { padding: 4px 9px; font-size: 16px; line-height: 1; }
+.fit-view { position: absolute; top: 56px; right: 12px; }
+.toolbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; display: flex; gap: 2px; padding: 4px;
+  border-radius: 12px; background: var(--glass-bg-strong); border: 1px solid var(--glass-border); }
+.toolbar[hidden] { display: none; }
+.toolbar button { border: none; background: transparent; border-radius: 9px; padding: 6px 8px; display: flex; align-items: center; }
+.toolbar button.active { background: var(--accent-grad); color: #fff; }
+.toolbar .sep { width: 1px; margin: 4px 4px; background: var(--glass-border); }
+.drop-hint.has-models { inset: auto 12px 64px auto; }
+.tool-panel { position: absolute; left: 12px; bottom: 64px; width: 250px; max-height: calc(100% - 140px); overflow: auto;
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px;
+  background: var(--glass-bg-strong); border: 1px solid var(--glass-border); font-size: 12.5px; }
+.tool-panel[hidden] { display: none; }
+.tool-panel .hint { margin: 0; }
+.tool-panel button { padding: 4px 8px; }
+.tool-panel input[type="text"], .tool-panel input[type="number"] { width: 100%; min-width: 0; padding: 3px 6px; border-radius: 7px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text); }
+.tp-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-warn { margin: 0; color: var(--danger); overflow-wrap: anywhere; }
+.tp-row { display: grid; grid-template-columns: 82px repeat(auto-fit, minmax(0, 1fr)); gap: 4px; align-items: center; }
+.tp-lab { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-align { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.tp-align .tp-lab { width: 100%; }
+.tool-panel .seg button { flex: 1; }
+.tool-panel .check { margin-top: 2px; }
+.tool-panel input[type="range"] { width: 100%; }
+.legend { position: absolute; left: 12px; bottom: 12px; top: 56px; width: 220px; overflow: auto; padding: 8px 10px; border-radius: 12px;
+  background: var(--glass-bg-strong); border: 1px solid var(--glass-border); font-size: 12.5px; }
+.legend[hidden] { display: none; }
+.lg-group { margin: 6px 0 2px; color: var(--text-dim); font-weight: 600; }
+.lg-row { display: grid; grid-template-columns: 16px 14px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 1px 0; cursor: pointer; }
+.lg-row input { margin: 0; }
+.lg-sw { width: 14px; height: 10px; border-radius: 3px; display: block; }
+.lg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-row small { color: var(--text-dim); }
+.layers { position: absolute; right: 12px; top: 96px; bottom: 12px; width: 150px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.layers[hidden] { display: none; }
+.layer-label { font-size: 12px; text-align: center; padding: 3px 8px; border-radius: 8px; background: var(--glass-bg-strong); }
+#layer-top { writing-mode: vertical-lr; direction: rtl; flex: 1; width: 28px; min-height: 0; }
+.layers .check { margin: 0; font-size: 12px; }
+
+/* Тонкая полоса прокрутки в цвет темы (пункт 5 Алексея). scrollbar-width/scrollbar-color не задаём:
+   с ними Chromium не смотрит на ::-webkit-scrollbar и рисует свою полосу в 10-11 px. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--glass-border-strong); }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* Выпадающий список: своя стрелка с отступом от края (пункт 6 Алексея; системная стояла
+   вплотную к рамке). Стрелка - две полоски градиентом цвета текста. */
+select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 34px;
+  background-color: var(--glass-bg);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 19px) 52%, calc(100% - 14px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+select:hover:not(:disabled) { background-color: var(--glass-bg-strong); }
 
 .side { width: 360px; flex: none; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .panel { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -130,6 +203,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 .adv-ctl { min-width: 0; display: flex; justify-content: flex-end; }
 .adv-ctl .adv-input, .adv-ctl .adv-select { width: 100%; min-width: 0; padding: 4px 8px; border-radius: 8px; font-size: 12.5px; }
 .adv-ctl .adv-input[readonly], .adv-ctl .adv-select:disabled { opacity: .6; }
+.adv-ctl .adv-select { padding-right: 28px; background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%; }
 .adv-help { width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 12px; line-height: 1; color: var(--text-dim); }
 .adv-desc { grid-column: 1 / -1; margin: 0; font-size: 11.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adv-item.open .adv-desc { white-space: normal; overflow-wrap: anywhere; color: var(--text); }
