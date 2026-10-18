@@ -1,7 +1,7 @@
 {
   "name": "slicer-cc",
   "productName": "Slicer CC",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Simple slicer for Elegoo Centauri Carbon: three choices for beginners and a reliable send to the printer",
   "author": "ALEXalesha",
   "license": "MIT",

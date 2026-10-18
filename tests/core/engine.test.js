@@ -40,6 +40,9 @@ test('fake engine: ok, fail, empty, missing exe', async () => {
   await assert.rejects(slice({ exe: FAKE, jobDir, ...j }), (e) => e instanceof EngineError && e.code === 'failed' && /found error/.test(e.detail));
   process.env.FAKE_ENGINE = 'empty';
   await assert.rejects(slice({ exe: FAKE, jobDir, ...j }), (e) => e.code === 'empty');
+  // Ревьювер 17.10 (А1): движок разложил лишнее на вторую пластину - это ошибка, а не печать первой.
+  process.env.FAKE_ENGINE = 'plates';
+  await assert.rejects(slice({ exe: FAKE, jobDir, ...j }), (e) => e.code === 'plates' && e.detail === '2');
   process.env.FAKE_ENGINE = 'hang';
   await assert.rejects(slice({ exe: FAKE, jobDir, ...j, timeoutMs: 1500 }), (e) => e.code === 'timeout');
   delete process.env.FAKE_ENGINE;

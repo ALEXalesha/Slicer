@@ -120,3 +120,18 @@ test('free spot avoids models already on the bed', () => {
   assert.ok(s && (s.x + 15 + 6 <= 100 || s.x - 15 - 6 >= 156 || s.y + 15 + 6 <= 100 || s.y - 15 - 6 >= 156));
   assert.strictEqual(M.freeSpot({ w: 300, d: 30 }, []), null);
 });
+
+function boxPos(x0, y0, z0, x1, y1, z1) {
+  const v = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+  const f = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 0]];
+  return f.flatMap((t) => t.flatMap((i) => v[i]));
+}
+
+test('lay flat counts only the outermost faces: a comb lies on its base, not on its fins', () => {
+  // основание 40x10x2 (низ 400 мм²) и 10 рёбер 1x10x30: боковые грани рёбер вместе 3000 мм²,
+  // но на краю модели из них только одна - лечь на рёбра нельзя
+  const parts = [boxPos(0, 0, 0, 40, 10, 2)];
+  for (let i = 0; i < 10; i++) parts.push(boxPos(i * 4, 0, 2, i * 4 + 1, 10, 32));
+  const n = M.largestFlatNormal(Float32Array.from(parts.flat()));
+  assert.deepStrictEqual(n.map((x) => Math.round(x)), [0, 0, -1]);
+});

@@ -63,3 +63,9 @@ test('law: garbage never throws and never yields NaN positions', () => {
     for (const d of r.data) for (const v of d.positions) assert.ok(Number.isFinite(v));
   }
 });
+
+test('G-code without layer marks (another slicer) is one layer, not empty', () => {
+  const r = parseGcodePreview(['M83', 'G1 X0 Y0 Z0.2', 'G1 X10 Y0 E1', 'G1 X10 Y10 E1'].join('\n'));
+  assert.strictEqual(r.layers.length, 1);
+  assert.strictEqual(r.data[idx('custom')].layerEnd[0], 2);
+});

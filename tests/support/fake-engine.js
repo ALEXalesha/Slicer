@@ -1,4 +1,4 @@
-// Поддельный движок: ведёт себя по FAKE_ENGINE (ok | slow | fail | empty | hang | bad-setting).
+// Поддельный движок: ведёт себя по FAKE_ENGINE (ok | slow | plates | fail | empty | hang | bad-setting).
 // bad-setting - как настоящий движок с неверным значением: причина в журнале 00000.log.
 'use strict';
 const fs = require('fs');
@@ -25,4 +25,6 @@ else {
     models.map((m) => 'EXCLUDE_OBJECT_DEFINE NAME=' + m + '\n').join('') +
     'G1 X1 Y1\n; filament used [mm] = 100.5\n; filament used [g] = 0.30\n; total filament used [g] = 0.30\n' +
     '; estimated printing time (normal mode) = 2m 3s\n; CONFIG_BLOCK_START\n; nozzle_temperature = 210\n; CONFIG_BLOCK_END\n');
+  // plates - как настоящий движок, когда модели не влезли на стол: вторая пластина рядом.
+  if (mode === 'plates') fs.copyFileSync(path.join(out, 'plate_1.gcode'), path.join(out, 'plate_2.gcode'));
 }

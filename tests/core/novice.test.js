@@ -63,6 +63,20 @@ test('novice screen has exactly three decisions', () => {
   assert.deepStrictEqual(N.NOVICE_ITEMS, ['filament', 'temperature', 'supports']);
 });
 
+// Пункт 3 Алексея: поддержки кистью. Замер на движке 18.10: при выключенных поддержках
+// раскраска «ставить» ничего не даёт, с tree(manual) - поддержки ровно по раскраске.
+test('law: painted supports - "None" turns into manual trees only by the paint, auto choices stay auto', () => {
+  fc.assert(fc.property(anyChoice, fc.boolean(), fc.boolean(), (choice, enforce, block) => {
+    const c = N.normalizeChoice(choice);
+    const proc = { enable_support: c.supports === 'none' ? '0' : '1', support_type: 'tree(auto)', support_on_build_plate_only: c.supports === 'everywhere' ? '0' : '1' };
+    const before = Object.assign({}, proc);
+    N.applyPaintedSupports(proc, choice, { enforce, block });
+    if (enforce && c.supports === 'none') {
+      assert.deepStrictEqual(proc, { enable_support: '1', support_type: 'tree(manual)', support_on_build_plate_only: '0' });
+    } else assert.deepStrictEqual(proc, before);
+  }), { numRuns: 300 });
+});
+
 const engine = findEngine();
 test('composeConfigs on the real presets', { skip: !engine && 'ElegooSlicer not installed' }, () => {
   const idx = P.buildIndex(engine.profilesDir);
