@@ -3,8 +3,10 @@
 // статус, пауза, список, старт) и по журналу ElegooSlicer (загрузка файла).
 'use strict';
 const crypto = require('crypto');
+const Control = require('./printer-control');
 
-const CMD = Object.freeze({ STATUS: 0, ATTR: 1, START: 128, PAUSE: 129, STOP: 130, RESUME: 131, FILES: 258, CAMERA: 386 });
+const CMD = Object.freeze({ STATUS: 0, ATTR: 1, START: 128, PAUSE: 129, STOP: 130, RESUME: 131, FILES: 258, CAMERA: 386,
+  MOVE: 401, HOME: 402, CONTROL: 403 });
 
 // PrintInfo.Status у Centauri Carbon. Идёт печать = 13 (проверено 18.09 на живом принтере).
 const PRINT_STATUS = Object.freeze({ 0: 'idle', 1: 'homing', 5: 'pausing', 6: 'paused', 7: 'stopping', 8: 'stopped', 9: 'finished',
@@ -41,12 +43,17 @@ function hasStarted(status) {
 /**
  * Запрос SDCP строкой JSON. Единственное место, где формируются запросы, поэтому здесь
  * и запрет: камеру выключать нельзя никогда - Enable 0 обрывает поток всем, кто его
- * смотрит (Elegoo Slicer, веб-страница принтера, AiForPrinter), 09.10.2026.
+ * смотрит (Elegoo Slicer, веб-страница принтера, AiForPrinter), 09.10.2026. Запросы 401/402/403
+ * (оси, «домой», температуры, вентиляторы, свет) проверяются printer-control.checkData.
  */
 function makeRequest(cmd, data, mainboardId, now = Date.now()) {
   if (!Number.isInteger(cmd)) throw new SdcpError('bad-cmd', String(cmd));
   const body = data && typeof data === 'object' ? data : {};
   if (cmd === CMD.CAMERA && body.Enable !== 1) throw new SdcpError('forbidden', 'camera stream may only be enabled');
+  // Оси, температуры, вентиляторы, свет: только то, что прошло проверки printer-control.
+  if (cmd === CMD.MOVE || cmd === CMD.HOME || cmd === CMD.CONTROL) {
+    try { Control.checkData(cmd, data); } catch (e) { throw new SdcpError(e.code || 'bad-data', e.detail || ''); }
+  }
   if (!mainboardId) throw new SdcpError('no-mainboard', '');
   return JSON.stringify({
     Id: crypto.randomUUID(),

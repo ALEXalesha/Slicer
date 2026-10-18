@@ -4,6 +4,7 @@
 const { EventEmitter } = require('events');
 const WebSocket = require('ws');
 const { CMD, SdcpError, makeRequest, mainboardOf, parseFileList } = require('./sdcp');
+const Control = require('./printer-control');
 
 const DEFAULT_PORT = 3030;
 
@@ -123,6 +124,47 @@ class PrinterClient extends EventEmitter {
   pause() { return this.request(CMD.PAUSE, {}); }
   resume() { return this.request(CMD.RESUME, {}); }
   stop() { return this.request(CMD.STOP, {}); }
+
+  /**
+   * Оси и «домой» - только в простое. Статус спрашиваем заново перед каждой командой: старый
+   * мог остаться от того, что было до старта печати. Нет ответа или занят - 'busy', 401/402 не уходят.
+   */
+  async _requireIdle() {
+    let s = null;
+    try { s = await this.status({ timeoutMs: 4000 }); } catch { s = null; }
+    if (!Control.canMove(s)) throw new SdcpError('busy', 'printer is not idle');
+  }
+
+  async _control(cmd, data) {
+    const r = await this.request(cmd, data);
+    const ack = Number(r && r.Ack);
+    if (Number.isFinite(ack) && ack !== 0) throw Object.assign(new SdcpError(cmd === CMD.MOVE && ack === 3 ? 'not-homed' : 'rejected', 'ack ' + ack), { ack });
+    return r;
+  }
+
+  /** Сдвиг оси на step мм (знак как в протоколе). */
+  async move(axis, step) {
+    const data = this._build(() => Control.moveData(axis, step));
+    await this._requireIdle();
+    return this._control(CMD.MOVE, data);
+  }
+
+  async home(axis = 'XYZ') {
+    const data = this._build(() => Control.homeData(axis));
+    await this._requireIdle();
+    return this._control(CMD.HOME, data);
+  }
+
+  setTemps(t) { return this._send403(() => Control.tempData(t)); }
+  setFans(f) { return this._send403(() => Control.fanData(f)); }
+  setLight(on) { return this._send403(() => Control.lightData(on)); }
+  setSpeed(pct) { return this._send403(() => Control.speedData(pct)); }
+
+  async _send403(build) { return this._control(CMD.CONTROL, this._build(build)); }
+
+  _build(fn) {
+    try { return fn(); } catch (e) { throw new SdcpError(e.code || 'bad-data', e.detail || ''); }
+  }
 
   /** Адрес видео. Только включение: Enable 0 не шлём никогда (см. sdcp.makeRequest). */
   async cameraUrl() {

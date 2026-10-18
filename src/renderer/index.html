@@ -141,6 +141,58 @@
         <p class="ai-state hint" id="ai-state"></p>
       </div>
     </section>
+    <!-- Управление принтером: оси, «домой», температуры, вентиляторы, свет, скорость -->
+    <section class="pcontrol" id="pcontrol">
+      <div class="pc-card" id="pc-axes">
+        <h3 data-i18n="pc.axes">Оси</h3>
+        <div class="pc-steprow"><span class="hint" data-i18n="pc.step">Шаг, мм</span>
+          <div class="seg" id="pc-step"><button data-step="0.1">0.1</button><button data-step="1">1</button><button data-step="10" class="active">10</button><button data-step="50">50</button></div>
+        </div>
+        <div class="jog">
+          <div class="jog-xy">
+            <button class="j-yp" data-jog="Y" data-dir="1">Y+</button>
+            <button class="j-xm" data-jog="X" data-dir="-1">X-</button>
+            <button class="j-home" id="pc-home-all" data-home="XYZ" data-i18n-title="pc.homeAll" title="Домой: все оси">⌂</button>
+            <button class="j-xp" data-jog="X" data-dir="1">X+</button>
+            <button class="j-ym" data-jog="Y" data-dir="-1">Y-</button>
+          </div>
+          <div class="jog-z">
+            <button data-jog="Z" data-dir="1" data-i18n-title="pc.zUp" title="Z вверх">Z ↑</button>
+            <button data-jog="Z" data-dir="-1" data-i18n-title="pc.zDown" title="Z вниз">Z ↓</button>
+          </div>
+        </div>
+        <div class="pc-homes"><span class="hint" data-i18n="pc.home">Домой</span>
+          <button data-home="XYZ" data-i18n="pc.all">Все</button><button data-home="X">X</button><button data-home="Y">Y</button><button data-home="Z">Z</button>
+        </div>
+        <p class="pc-coord">X <b id="pc-x">-</b> Y <b id="pc-y">-</b> Z <b id="pc-z">-</b></p>
+        <p class="hint pc-lock" id="pc-lock"></p>
+      </div>
+      <div class="pc-card" id="pc-temps">
+        <h3 data-i18n="pc.temps">Температуры</h3>
+        <div class="pc-temp">
+          <span data-i18n="printer.nozzle">Сопло</span><b id="pc-nozzle-now">-</b>
+          <input type="number" id="pc-nozzle" min="0" max="350" step="1" inputmode="numeric">
+          <button id="pc-nozzle-set" data-i18n="pc.set">Задать</button>
+        </div>
+        <div class="pc-temp">
+          <span data-i18n="printer.bed">Стол</span><b id="pc-bed-now">-</b>
+          <input type="number" id="pc-bed" min="0" max="110" step="1" inputmode="numeric">
+          <button id="pc-bed-set" data-i18n="pc.set">Задать</button>
+        </div>
+        <p class="hint" data-i18n="pc.tempHint">Текущая / целевая. 0 - выключить нагрев.</p>
+      </div>
+      <div class="pc-card" id="pc-fans">
+        <h3 data-i18n="pc.fans">Вентиляторы и свет</h3>
+        <label class="pc-fan"><span data-i18n="pc.fanModel">Модель</span><input type="range" id="pc-fan-model" min="0" max="100" step="1" value="0"><b id="pc-fan-model-v">-</b></label>
+        <label class="pc-fan"><span data-i18n="pc.fanAux">Вспомогательный</span><input type="range" id="pc-fan-aux" min="0" max="100" step="1" value="0"><b id="pc-fan-aux-v">-</b></label>
+        <label class="pc-fan"><span data-i18n="pc.fanBox">Корпус</span><input type="range" id="pc-fan-box" min="0" max="100" step="1" value="0"><b id="pc-fan-box-v">-</b></label>
+        <label class="check"><input type="checkbox" id="pc-light"> <span data-i18n="pc.light">Свет</span></label>
+        <div class="pc-steprow"><span class="hint" data-i18n="pc.speed">Скорость печати</span>
+          <div class="seg" id="pc-speed"><button data-speed="50" data-i18n="pc.sp50">Тихо</button><button data-speed="100" data-i18n="pc.sp100">Баланс</button><button data-speed="130" data-i18n="pc.sp130">Спорт</button><button data-speed="160" data-i18n="pc.sp160">Быстро</button></div>
+        </div>
+      </div>
+      <p class="status pc-msg" id="pc-msg"></p>
+    </section>
   </main>
 
   <dialog id="confirm"><p id="confirm-text"></p><div class="row"><button id="confirm-yes" class="danger"></button><button id="confirm-no"></button></div></dialog>

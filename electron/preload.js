@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('slicer', {
     connect: call('printer:connect'),
     disconnect: call('printer:disconnect'),
     command: call('printer:command'),
+    control: call('printer:control'),
     camera: call('printer:camera'),
     onStatus: listen('printer:status'),
     onLost: listen('printer:lost'),

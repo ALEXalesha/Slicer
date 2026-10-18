@@ -65,3 +65,17 @@ test('edits are checked by the catalog before they are stored', () => {
   fs.writeFileSync(f, JSON.stringify({ advanced: { process: { layer_height: 'abc' }, filament: {} } }));
   assert.deepStrictEqual(S.load(f).advanced, { process: {}, filament: {} });
 });
+
+// Ревью 18.10 (В1): «http://192.0.2.1» молча становился пустым адресом и окно писало «Принтер не отвечает».
+test('host typed as a URL is cleaned: scheme, trailing slash and spaces go, the rest must be a host', () => {
+  for (const [raw, want] of [['http://192.0.2.1', '192.0.2.1'], ['http://192.0.2.1/', '192.0.2.1'], ['HTTPS://printer.local//', 'printer.local'],
+    ['  192.168.0.50  ', '192.168.0.50'], ['ws://127.0.0.1:4030/', '127.0.0.1:4030'], ['', ''], ['192.168.0.50', '192.168.0.50']]) {
+    assert.strictEqual(S.normalizeHost(raw), want, raw);
+  }
+  for (const bad of ['http://192.0.2.1/index.html', 'ftp://1.2.3.4', 'a b', 'http://', ' / ', '..\\x', null, 5]) assert.strictEqual(S.normalizeHost(bad), null, String(bad));
+  assert.strictEqual(S.normalize({ printerHost: 'http://192.0.2.1/' }).printerHost, '192.0.2.1');
+  fc.assert(fc.property(fc.string(), (s) => {
+    const h = S.normalizeHost(s);
+    if (h !== null) { assert.ok(S.isHost(h)); assert.strictEqual(S.normalizeHost(h), h); }
+  }), { numRuns: 500 });
+});
