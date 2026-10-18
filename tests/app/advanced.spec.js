@@ -199,19 +199,10 @@ test('А4: the engine refuses a setting - the status names it, not "model larger
   try {
     await openCube(app, win);
     await win.click('#mode button[data-mode="advanced"]');
-    // Строку состояния пишет prepare.js (код bad-setting добавит координатор при слиянии):
-    // проверяем ответ нарезки и текст, который из него получится.
-    const res = await win.evaluate(async () => {
-      const { t } = await import('./i18n.js');
-      const paths = await window.slicer.openModels();
-      const r = await window.slicer.slice({ models: paths.map((p) => ({ path: p, name: 'c.stl' })), mode: 'advanced', choice: window.slicerPrepare.choice() });
-      return { r, text: t('eng.bad-setting', { why: r.detail }) };
-    });
-    expect(res.r.ok).toBe(false);
-    expect(res.r.code).toBe('bad-setting');
-    expect(res.r.key).toBe('layer_height');
-    expect(res.r.detail).toContain('«Высота слоя» (layer_height)');
-    expect(res.text).toContain('Invalid value provided for parameter layer_height');
-    expect(res.text).not.toContain('больше стола');
+    await win.click('#slice');
+    await expect(win.locator('#status')).toContainText('«Высота слоя» (layer_height)', { timeout: 60000 });
+    await expect(win.locator('#status')).toContainText('Invalid value provided for parameter layer_height');
+    await expect(win.locator('#status')).not.toContainText('больше стола');
+    await expect(win.locator('#status')).toHaveClass(/error/);
   } finally { await app.close(); }
 });

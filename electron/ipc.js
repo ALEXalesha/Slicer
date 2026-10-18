@@ -197,14 +197,23 @@ function registerIpc(ctx) {
       const jobDir = path.join(root, 'job-' + Date.now());
       const buffer = buildProject3mf(plate.objects);
       const job = prepareJob({ jobDir, models: [{ path: 'plate.3mf', name: 'plate', buffer }], configs });
+      const keys = [...Object.keys(configs.process), ...Object.keys(configs.filament)];
+      const adv = settings.advanced;
+      const preferred = mode === 'advanced' ? [...Object.keys(adv.process), ...Object.keys(Novice.filamentEdits(adv, configs.choice.filament))] : [];
       last = null;
-      const res = await slice({ exe: engine.exe, jobDir, ...job, arrange: 0 });
+      const res = await slice({ exe: engine.exe, jobDir, ...job, arrange: 0, keys, preferred });
       const fil = Novice.filamentInfo(configs.choice.filament);
       last = { gcodePath: res.gcodePath, info: res.info, modelName: plate.objects[0].title, filament: fil.label };
       const { settings: _s, ...short } = res.info;
       return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, objects: plate.objects.length, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
     } catch (e) {
-      return { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || '') };
+      // bad-setting: в detail сразу понятное «Высота слоя» (layer_height): причина движка.
+      const detail = String(e.detail || e.message || '');
+      if (e.code === 'bad-setting' && e.key) {
+        const label = Catalog.label(e.key, settings.lang) || e.key;
+        return { ok: false, code: 'bad-setting', key: e.key, detail: '«' + label + '» (' + e.key + '): ' + detail };
+      }
+      return { ok: false, code: e.code || 'failed', detail };
     }
   });
 
