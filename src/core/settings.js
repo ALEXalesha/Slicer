@@ -4,6 +4,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const Catalog = require('./settings-catalog');
+const { FILAMENTS, normalizeChoice } = require('./novice');
 
 const THEMES = ['glass', 'formal', 'light', 'night', 'warm'];
 const LANGS = ['ru', 'en'];
@@ -16,7 +18,7 @@ const DEFAULTS = Object.freeze({
   choice: null,          // нормализует novice.normalizeChoice
   printerHost: '',       // '' - искать в сети
   bedLeveling: true,     // калибровка стола перед печатью (Calibration_switch)
-  advanced: { process: {}, filament: {} },
+  advanced: { process: {}, filament: {} },   // filament: { <id филамента>: { ключ: значение } }
   quality: '',           // '' - 0.20mm Standard
   plate: 'Textured PEI Plate',
 });
@@ -33,6 +35,44 @@ function plainObject(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
 }
 
+const KEY_RE = /^[A-Za-z][A-Za-z0-9_]{0,99}$/;
+const FIL_IDS = FILAMENTS.map((f) => f.id);
+const isScalar = (v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+
+// Правки одного пресета: только ключи-имена и значения, которые проходят проверку каталога
+// (запятая -> точка). Неверное не сохраняется: в файл попадает только то, что примет движок.
+function cleanEdits(raw) {
+  const out = {};
+  for (const [k, v0] of Object.entries(plainObject(raw) || {})) {
+    const v = Array.isArray(v0) && v0.length && isScalar(v0[0]) ? v0[0] : v0;
+    if (!KEY_RE.test(k) || !isScalar(v)) continue;
+    const c = Catalog.check(k, String(v));
+    if (c.ok && c.value.length <= 500) out[k] = c.value;
+  }
+  return out;
+}
+
+// Правки филаментов по id. Старый формат (до 0.1.1) - плоские правки, общие для всех
+// филаментов: переносим в выбранный тогда филамент, ничего не теряя. Новые правки этого
+// филамента, если есть, главнее.
+function filamentEditsById(advFilament, choice) {
+  const src = plainObject(advFilament) || {};
+  const out = {};
+  const legacy = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (!KEY_RE.test(k)) continue;
+    if (FIL_IDS.includes(k) && plainObject(v)) out[k] = cleanEdits(v);
+    else if (!FIL_IDS.includes(k)) legacy[k] = v;
+  }
+  const old = cleanEdits(legacy);
+  if (Object.keys(old).length) {
+    const id = normalizeChoice(choice).filament;
+    out[id] = Object.assign(old, out[id] || {});
+  }
+  for (const id of Object.keys(out)) if (!Object.keys(out[id]).length) delete out[id];
+  return out;
+}
+
 function normalize(raw) {
   const r = plainObject(raw) || {};
   const adv = plainObject(r.advanced) || {};
@@ -43,7 +83,7 @@ function normalize(raw) {
     choice: plainObject(r.choice),
     printerHost: isHost(r.printerHost) ? r.printerHost : DEFAULTS.printerHost,
     bedLeveling: typeof r.bedLeveling === 'boolean' ? r.bedLeveling : DEFAULTS.bedLeveling,
-    advanced: { process: plainObject(adv.process) || {}, filament: plainObject(adv.filament) || {} },
+    advanced: { process: cleanEdits(adv.process), filament: filamentEditsById(adv.filament, r.choice) },
     quality: typeof r.quality === 'string' ? r.quality : DEFAULTS.quality,
     plate: typeof r.plate === 'string' && r.plate ? r.plate : DEFAULTS.plate,
   };
@@ -65,4 +105,4 @@ function save(file, settings) {
   fs.renameSync(tmp, file);
 }
 
-module.exports = { load, save, normalize, DEFAULTS, THEMES, LANGS, MODES, isHost };
+module.exports = { load, save, normalize, cleanEdits, DEFAULTS, THEMES, LANGS, MODES, isHost };

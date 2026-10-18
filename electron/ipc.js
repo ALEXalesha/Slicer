@@ -9,6 +9,7 @@ const Settings = require('../src/core/settings');
 const { findEngine } = require('../src/core/engine-locate');
 const Presets = require('../src/core/presets');
 const Novice = require('../src/core/novice');
+const Catalog = require('../src/core/settings-catalog');
 const { prepareJob, MODEL_EXT } = require('../src/core/job');
 const { slice } = require('../src/core/engine');
 const { printerFileName } = require('../src/core/names');
@@ -189,14 +190,23 @@ function registerIpc(ctx) {
       cleanJobs(root);
       const jobDir = path.join(root, 'job-' + Date.now());
       const job = prepareJob({ jobDir, models, configs });
+      const keys = [...Object.keys(configs.process), ...Object.keys(configs.filament)];
+      const adv = settings.advanced;
+      const preferred = mode === 'advanced' ? [...Object.keys(adv.process), ...Object.keys(Novice.filamentEdits(adv, configs.choice.filament))] : [];
       last = null;
-      const res = await slice({ exe: engine.exe, jobDir, ...job });
+      const res = await slice({ exe: engine.exe, jobDir, ...job, keys, preferred });
       const fil = Novice.filamentInfo(configs.choice.filament);
       last = { gcodePath: res.gcodePath, info: res.info, modelName: models[0].name || path.basename(models[0].path), filament: fil.label };
       const { settings: _s, ...short } = res.info;
       return { ok: true, info: short, temp: res.info.settings.nozzle_temperature, name: printerFileName({ model: last.modelName, filament: fil.label, timeSec: res.info.timeSec }) };
     } catch (e) {
-      return { ok: false, code: e.code || 'failed', detail: String(e.detail || e.message || '') };
+      // bad-setting: в detail сразу понятное «Высота слоя» (layer_height): причина движка.
+      const detail = String(e.detail || e.message || '');
+      if (e.code === 'bad-setting' && e.key) {
+        const label = Catalog.label(e.key, settings.lang) || e.key;
+        return { ok: false, code: 'bad-setting', key: e.key, detail: '«' + label + '» (' + e.key + '): ' + detail };
+      }
+      return { ok: false, code: e.code || 'failed', detail };
     }
   }
 

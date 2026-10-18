@@ -80,7 +80,7 @@ test('composeConfigs on the real presets', { skip: !engine && 'ElegooSlicer not 
     assert.ok(!('inherits' in c.filament) && !('inherits' in c.process) && !('inherits' in c.machine));
   }
   // Review Focus 5: в «Новичке» правки «Продвинутого» не участвуют
-  const adv = { process: { wall_loops: '9' }, filament: { nozzle_temperature: '260' } };
+  const adv = { process: { wall_loops: '9' }, filament: { pla: { nozzle_temperature: '260' } } };
   const plain = N.composeConfigs(idx, { mode: 'novice', choice: { filament: 'pla' } });
   const withAdv = N.composeConfigs(idx, { mode: 'novice', choice: { filament: 'pla' }, advanced: adv, quality: N.QUALITIES[0], plate: 'Cool Plate' });
   assert.deepStrictEqual(withAdv, plain);
@@ -89,6 +89,37 @@ test('composeConfigs on the real presets', { skip: !engine && 'ElegooSlicer not 
   assert.deepStrictEqual(a.filament.nozzle_temperature, ['260']);
   assert.strictEqual(a.process.curr_bed_type, 'Cool Plate');
   assert.strictEqual(a.process.layer_height, '0.12');
+});
+
+// А3 (ревьювер): сопло 215 из PETG уезжало в G-code PLA. Правки филамента - по id.
+test('law: filament edits belong to their filament only', { skip: !engine && 'ElegooSlicer not installed' }, () => {
+  const idx = P.buildIndex(engine.profilesDir);
+  const adv = { process: {}, filament: { petg: { nozzle_temperature: '215' }, pla: { nozzle_temperature: '205' } } };
+  const pla = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: 'pla' }, advanced: adv });
+  const petg = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: 'petg' }, advanced: adv });
+  const abs = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: 'abs' }, advanced: adv });
+  const absPlain = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: 'abs' } });
+  assert.deepStrictEqual(pla.filament.nozzle_temperature, ['205']);
+  assert.deepStrictEqual(petg.filament.nozzle_temperature, ['215']);
+  assert.deepStrictEqual(abs.filament, absPlain.filament, 'no edits of PLA/PETG reach ABS');
+  fc.assert(fc.property(fc.constantFrom(...N.FILAMENTS.map((f) => f.id)), fc.constantFrom(...N.FILAMENTS.map((f) => f.id)), fc.integer({ min: 180, max: 300 }), (a, b, temp) => {
+    fc.pre(a !== b);
+    const one = { process: {}, filament: { [a]: { nozzle_temperature: String(temp) } } };
+    const other = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: b }, advanced: one });
+    const clean = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: b } });
+    assert.deepStrictEqual(other.filament, clean.filament);
+    const mine = N.composeConfigs(idx, { mode: 'advanced', choice: { filament: a }, advanced: one });
+    assert.deepStrictEqual(mine.filament.nozzle_temperature, [String(temp)]);
+  }), { numRuns: 30 });
+});
+
+test('engine keys missing from the preset are added only when the catalog knows them', () => {
+  const p = { a: '1' };
+  N.applyEdits(p, { fuzzy_skin: 'external', zzz: '1', filament_shrink: '99%' }, 'process');
+  assert.deepStrictEqual(p, { a: '1', fuzzy_skin: 'external' });
+  const f = { b: ['1'] };
+  N.applyEdits(f, { filament_shrink: '99%', fuzzy_skin: 'external' }, 'filament');
+  assert.deepStrictEqual(f, { b: ['1'], filament_shrink: ['99%'] });
 });
 
 test('applyEdits ignores protected and unknown keys', () => {

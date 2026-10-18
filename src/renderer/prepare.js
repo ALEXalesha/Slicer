@@ -98,7 +98,7 @@ function buildFilaments() {
   }
 }
 
-const ENGINE_CODES = ['not-found', 'failed', 'timeout', 'empty'];
+const ENGINE_CODES = ['not-found', 'failed', 'timeout', 'empty', 'bad-setting'];
 
 async function doSlice() {
   if (busy) return;
