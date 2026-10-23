@@ -130,7 +130,7 @@ export const TEXT = {
     'act.removed': 'Убрано моделей: {n}. Вернуть - Ctrl+Z.',
     'paint.clearAsk': 'Ничего не выбрано. Стереть раскраску поддержек у всех покрашенных моделей ({n})?', 'paint.clearAsk.yes': 'Стереть у всех', 'paint.clearAll': 'Очистить все',
     'adv.resetAsk': 'Сбросить все правки «Продвинутого» ({n}: печать и все филаменты)? Вернуть можно Ctrl+Z.', 'adv.resetAsk.yes': 'Сбросить',
-    'stage.count': 'Моделей: {n}', 'stage.offCount': 'за краем: {n}', 'stage.removeOff': 'Убрать лишние',
+    'stage.count': 'Моделей: {n}', 'stage.removeOff': 'Убрать за краем ({n})',
     'stage.removeOffHint': 'Убрать со стола модели, которые стоят за его краем (красные). Вернуть - Ctrl+Z.',
     // Печать (обзор 23.10 Б4, Б6)
     'send.cancel': 'Отменить отправку', 'send.canceling': 'Отменяю…', 'send.canceled': 'Отправка отменена, печать не началась.',
@@ -271,7 +271,7 @@ export const TEXT = {
     'act.removed': 'Models removed: {n}. Ctrl+Z brings them back.',
     'paint.clearAsk': 'Nothing is selected. Erase the support paint of all painted models ({n})?', 'paint.clearAsk.yes': 'Erase on all', 'paint.clearAll': 'Clear all',
     'adv.resetAsk': 'Reset all Advanced changes ({n}: print and every filament)? Ctrl+Z brings them back.', 'adv.resetAsk.yes': 'Reset',
-    'stage.count': 'Models: {n}', 'stage.offCount': 'off the plate: {n}', 'stage.removeOff': 'Remove extra',
+    'stage.count': 'Models: {n}', 'stage.removeOff': 'Remove off-plate ({n})',
     'stage.removeOffHint': 'Remove the models that stand off the plate (red). Ctrl+Z brings them back.',
     // Print
     'send.cancel': 'Cancel sending', 'send.canceling': 'Canceling…', 'send.canceled': 'Sending canceled, the print did not start.',

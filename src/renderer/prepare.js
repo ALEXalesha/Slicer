@@ -66,6 +66,7 @@ function showStage(mode) {
   editor.scene.setMode(mode);
   $('#legend').hidden = mode !== 'layers';
   $('#layers').hidden = mode !== 'layers';
+  $('#left-col').hidden = mode !== 'models';           // и шапка «Моделей: N» не висит над легендой слоёв
   $('#models').hidden = mode !== 'models';
   $('#drop-hint').hidden = mode !== 'models';
   $('#show-layers').title = $('#show-layers').disabled ? t('view.needSlice') : '';
@@ -102,15 +103,13 @@ function renderModels() {
     n.textContent = t('stage.count', { n: states.length });
     head.append(n);
     if (off) {
-      const o = document.createElement('span');
-      o.className = 'off';
-      o.textContent = t('stage.offCount', { n: off });
       const b = document.createElement('button');
       b.id = 'remove-off';
-      b.textContent = t('stage.removeOff');
+      b.className = 'danger';
+      b.textContent = t('stage.removeOff', { n: off });
       b.title = t('stage.removeOffHint');
       b.addEventListener('click', () => { const k = editor.removeOff(); if (k) setStatus('act.removed', { n: k }, ''); });
-      head.append(o, b);
+      head.append(b);
     }
   }
   $('#drop-hint').classList.toggle('has-models', states.length > 0);
@@ -243,7 +242,7 @@ function drawSteps() {
     const li = document.createElement('li');
     li.dataset.step = s;
     const j = STEPS.indexOf(s);
-    li.textContent = t('send.' + s) + (s === sendState.step && sendState.extra ? ' ' + sendState.extra : '');
+    li.textContent = t('send.' + s) + (s === sendState.step && sendState.extra ? ': ' + sendState.extra : '');
     li.className = sendState.done ? 'done' : j < i ? 'done' : j === i ? (sendState.fail ? 'fail' : 'now') : '';
     ol.append(li);
   }

@@ -179,3 +179,11 @@ test('cancel during the upload stops between chunks; nothing starts', () => with
   assert.ok(fake.log.filter((e) => e.http === 'chunk').length < 10);
   assert.strictEqual(fake.commands(128).length, 0);
 }));
+
+test('cancel that comes with the start step still stops before the start command', () => withFake({}, async (fake) => {
+  const ctl = new AbortController();
+  const p = sendToPrinter({ host: fake.host, buffer: data(1000), remoteName: 's.gcode', ...fast, signal: ctl.signal,
+    onStep: (s) => { if (s.step === 'start') ctl.abort(); } });
+  await assert.rejects(p, (e) => e.code === 'canceled');
+  assert.strictEqual(fake.commands(128).length, 0);
+}));

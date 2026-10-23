@@ -55,8 +55,9 @@ button.big { width: 100%; padding: 12px; font-size: 16px; }
 .models > .chip { flex: none; }
 .models-head { flex: none; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); padding: 0 2px; }
 .models-head[hidden] { display: none; }
-.models-head .off { color: var(--danger); }
+.models-head { white-space: nowrap; min-height: 24px; }
 .models-head button { padding: 2px 8px; font-size: 12.5px; margin-left: auto; }
+.left-col[hidden] { display: none; }
 .models .chip { display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 10px;
   background: var(--glass-bg-strong); border: 1px solid var(--glass-border); }
 .models .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -318,7 +318,8 @@ test('review-03 A3: many models - the name list scrolls on its own and never lie
       }
     }
     // красные «лишние» видны в шапке списка, «Убрать лишние» убирает их, Ctrl+Z возвращает
-    await expect(win.locator('#models-head')).toContainText('за краем: 3');
+    await expect(win.locator('#remove-off')).toHaveText('Убрать за краем (3)');
+    expect(await win.evaluate(() => { const h = document.querySelector('#models-head'); return h.getBoundingClientRect().height < 30 && h.scrollWidth <= h.clientWidth + 1; })).toBe(true);
     await win.click('#remove-off');
     expect(await names(win)).toHaveLength(9);
     await expect(win.locator('#models .chip.off')).toHaveCount(0);
