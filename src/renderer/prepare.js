@@ -1,6 +1,6 @@
 // Раздел «Подготовка»: модели на столе (редактор - editor.js), три выбора «Новичка»,
 // нарезка, слои (preview.js), экспорт, печать.
-import { t, formatTime } from './i18n.js';
+import { t, formatTime, num } from './i18n.js';
 import { onSettings, getSettings, patchSettings } from './app.js';
 import { Editor } from './editor.js';
 import { Preview } from './preview.js';
@@ -185,7 +185,7 @@ const ENGINE_CODES = ['not-found', 'failed', 'timeout', 'empty', 'bad-setting', 
 function renderResult() {
   if (!sliced) return;
   $('#res-time').textContent = t('res.time', { t: formatTime(sliced.info.timeSec) });
-  $('#res-weight').textContent = sliced.info.filamentG ? t('res.weight', { g: Math.round(sliced.info.filamentG * 10) / 10 }) : '';
+  $('#res-weight').textContent = sliced.info.filamentG ? t('res.weight', { g: num(sliced.info.filamentG, 1) }) : '';
   $('#res-layers').textContent = t('res.layers', { n: sliced.info.layers });
 }
 
@@ -213,12 +213,13 @@ async function doSlice() {
     $('#result').hidden = false;
     $('#print').disabled = false;
     $('#export').disabled = false;
-    setStatus('=', { text: r.name }, 'ok');
+    setStatus('act.sliced', { name: r.name }, 'ok');            // В3: не одно имя файла, а «Нарезано: …»
     const p = await S.preview();
     if (my !== gen || !p || !p.ok) return;
     preview.set(p.preview);
     $('#show-layers').disabled = false;
     showStage('layers');
+    editor.scene.fitBox(editor.platedBox());      // Б9: слои - ближе к моделям; «весь стол» - кнопкой
   } finally {
     busy = false;
     $('#slice').disabled = false;
@@ -264,6 +265,17 @@ function sendError(r) {
   }
 }
 
+// Где остановилась неудачная отправка (обзор 23.10 Б3: «занят» красил шаг «Связь с принтером»).
+const FAIL_STEP = { offline: 'connect', 'no-host': 'connect', 'host-canceled': 'connect', busy: 'check-idle', upload: 'upload',
+  'not-listed': 'verify', 'size-mismatch': 'verify', 'start-rejected': 'start', 'not-started': 'start' };
+
+// Отменить можно до команды старта: она уходит один раз, дальше печать идёт на принтере (Б4).
+function showCancel(on) {
+  const b = $('#send-cancel');
+  b.hidden = !on;
+  if (on) { b.disabled = false; b.textContent = t('send.cancel'); }
+}
+
 async function doPrint() {
   if (busy || !sliced) return;
   busy = true;
@@ -272,9 +284,13 @@ async function doPrint() {
   setStatus('');
   sendState = { step: 'connect', extra: '' };
   drawSteps();
+  showCancel(true);
   const off = S.onSendStep((s) => {
     let extra = '';
     if (s.step === 'upload' && s.total) extra = Math.floor((s.sent / s.total) * 100) + ' %' + (s.attempt > 1 ? ', ' + t('send.retry', { n: s.attempt, max: s.attempts }) : '');
+    // Б4: ожидание «принтер видит файл» - не тишина до минуты, а попытка и секунды.
+    if (s.step === 'verify' && s.attempts) extra = t('send.verifyWait', { n: s.attempt, max: s.attempts, s: s.waitedSec || 0, total: s.timeoutSec || 0 });
+    if (s.step === 'start' || s.step === 'started') showCancel(false);
     sendState = { step: s.step, extra };
     drawSteps();
   });
@@ -288,14 +304,18 @@ async function doPrint() {
     if (r.ok) {
       sendState = { step: 'started', extra: '', done: true };
       setStatus('send.ok', { name: r.name }, 'ok');
+    } else if (r.code === 'canceled') {
+      sendState = null;
+      setStatus('send.canceled', {}, '');
     } else {
-      if (sendState) sendState.fail = true;
+      sendState = { step: r.step || FAIL_STEP[r.code] || (sendState && sendState.step) || 'connect', extra: '', fail: true };
       setStatus('=', { text: sendError(r) }, 'error');
       status.retext = () => sendError(r);
     }
     drawSteps();
   } finally {
     off();
+    showCancel(false);
     busy = false;
     $('#print').disabled = !sliced;
     $('#slice').disabled = false;
@@ -317,7 +337,17 @@ function wireDrop() {
   document.addEventListener('drop', (e) => e.preventDefault());
 }
 
+// Б6: куда уйдёт печать и калибровка стола - прямо над «Печать» (общая с вкладкой «Принтер»).
+function drawTarget(s) {
+  if (!s) return;
+  const el = $('#print-target');
+  el.textContent = s.printerHost ? t('act.target', { host: s.printerHost }) : t('act.targetNone');
+  el.title = s.printerHost ? t('act.targetHint') : t('act.targetNoneHint');
+  $('#print-leveling').checked = !!s.bedLeveling;
+}
+
 function onLang() {
+  drawTarget(getSettings());
   renderChoice();
   renderModels();
   renderResult();
@@ -344,6 +374,13 @@ async function init() {
   $('#slice').addEventListener('click', doSlice);
   $('#export').addEventListener('click', doExport);
   $('#print').addEventListener('click', doPrint);
+  $('#send-cancel').addEventListener('click', () => {
+    const b = $('#send-cancel');
+    b.disabled = true;
+    b.textContent = t('send.canceling');
+    S.cancelPrint();
+  });
+  $('#print-leveling').addEventListener('change', (e) => patchSettings({ bedLeveling: e.target.checked }));
   for (const b of document.querySelectorAll('#view-switch button')) b.addEventListener('click', () => { if (!b.disabled) showStage(b.dataset.show); });
   $('#fit-view').addEventListener('click', () => editor.scene.fitView());
   $('#fit-view').title = t('view.fit');
@@ -360,7 +397,7 @@ async function init() {
     else if (ctrl && !e.altKey && e.code === 'KeyA' && editor.scene.mode === 'models') { e.preventDefault(); editor.selectAll(); }
     else if (e.key === 'Delete' && editor.scene.mode === 'models') editor.removeWithNote();
   });
-  const theme = () => editor.scene.setTheme(document.documentElement.dataset.theme === 'light');
+  const theme = () => editor.scene.setTheme(document.documentElement.dataset.theme || 'dark');
   new MutationObserver(theme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   theme();
   wireDrop();
@@ -368,7 +405,7 @@ async function init() {
   document.addEventListener('slicer:mode', invalidate);
   document.addEventListener('slicer:advanced', invalidate);
   document.addEventListener('slicer:choice', (e) => { if (e.detail) { choice = Object.assign({}, choice, e.detail); renderChoice(); invalidate(); } });
-  onSettings(() => {});
+  onSettings(drawTarget);
   showStage('models');
 }
 
@@ -379,4 +416,5 @@ window.slicerPrepare = {
   choice: () => choice,
   gen: () => gen,
   history: History,
+  refreshTarget: async () => drawTarget(await S.settings.get()),
 };

@@ -68,7 +68,8 @@ button.big { width: 100%; padding: 12px; font-size: 16px; }
 .models .chip.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .models .chip.off { border-color: var(--danger); }
 .models .chip.off span { color: var(--danger); }
-.status { overflow-wrap: anywhere; min-width: 0; }
+/* break-word, а не anywhere: длинное имя рвётся, только если не влезает целиком (В14: «кату / шки»). */
+.status { overflow-wrap: break-word; min-width: 0; }
 
 /* Редактор моделей и слои (0.2) */
 .view-switch { position: absolute; top: 12px; right: 12px; }
@@ -192,7 +193,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .ai-alert[hidden] { display: none; }
 .ai-alert img { width: 200px; border-radius: 10px; }
 .ai-alert b { color: var(--danger); font-size: 16px; }
-dialog { border: 1px solid var(--glass-border); border-radius: 14px; background: var(--app-base); color: var(--text); padding: 18px; max-width: 420px; }
+dialog { border: 1px solid var(--glass-border); border-radius: 14px; background: var(--app-base); color: var(--text); padding: 18px; max-width: 480px; }
 dialog::backdrop { background: rgba(0, 0, 0, .5); }
 
 /* Продвинутый */
@@ -280,3 +281,37 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; cursor: pointer;
   background: var(--text-dim);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+
+/* Блок кнопок (обзор 23.10 Б5, Б6): кнопки внизу блока, итог, статус и шаги растут вверх - кнопки
+   не сдвигаются; пустой статус места не занимает. Строка «Куда / калибровка» - в одну строку. */
+.actions .status:empty { display: none; }
+.print-target { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-dim); min-height: 22px; }
+.print-target > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.print-target .check { margin: 0; flex: none; color: var(--text); }
+#send-cancel { padding: 5px 10px; font-size: 13px; }
+#send-cancel[hidden] { display: none; }
+
+/* Подпись поверх окна камеры: окно камеры чёрное в любой теме - и подпись светлая (Б7). */
+.camera .hint { color: #c9ced8; padding: 0 16px; text-align: center; }
+
+/* Выключенная «опасная» кнопка не выглядит включённой (В5). */
+button.danger:disabled { border-color: var(--glass-border); color: var(--text-dim); }
+
+/* Почти белые цвета легенды («Заполнение щелей») видны и на светлом (В8). */
+.lg-sw { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .28); }
+
+/* Малое окно (Б8): по высоте 980x640 три карточки «Новичка» и кнопки помещаются без прокрутки. */
+@media (max-height: 720px) {
+  #view-prepare { gap: 10px; padding: 10px; }
+  .side { gap: 8px; }
+  .panel { gap: 8px; }
+  .card { padding: 8px 12px; }
+  .card h3 { margin-bottom: 6px; }
+  .card .hint { margin-top: 4px; font-size: 12px; line-height: 1.3; }
+  .card .check { margin-top: 6px; }
+  .choices button { padding-top: 5px; padding-bottom: 5px; }
+  .actions { padding: 10px; gap: 6px; }
+  button.big { padding: 9px; font-size: 15px; }
+  .row > button { padding-top: 6px; padding-bottom: 6px; }
+  .topbar { padding-top: 7px; padding-bottom: 7px; }
+}

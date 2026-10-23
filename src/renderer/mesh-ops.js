@@ -314,10 +314,11 @@ export function onBed(min, max, bed = BED, eps = 0.01) {
 export function freeSpot(size, taken, { bed = BED, gap = 6, step = 4 } = {}) {
   const fits = (x, y) => taken.every((r) => x + size.w / 2 + gap <= r.min[0] || x - size.w / 2 - gap >= r.max[0] ||
     y + size.d / 2 + gap <= r.min[1] || y - size.d / 2 - gap >= r.max[1]);
-  // по спирали от центра стола: ближе к центру - лучше
+  // по спирали от центра стола: ближе к центру - лучше; сдвиг вбок дешевле, чем назад, - камера
+  // смотрит спереди, и модель прямо за другой не видна (В10)
   const cands = [];
   for (let x = size.w / 2 + 3; x <= bed - size.w / 2 - 3; x += step) {
-    for (let y = size.d / 2 + 3; y <= bed - size.d / 2 - 3; y += step) cands.push([x, y, (x - bed / 2) ** 2 + (y - bed / 2) ** 2]);
+    for (let y = size.d / 2 + 3; y <= bed - size.d / 2 - 3; y += step) cands.push([x, y, (x - bed / 2) ** 2 + 4 * (y - bed / 2) ** 2]);
   }
   cands.sort((a, b) => a[2] - b[2]);
   for (const [x, y] of cands) if (fits(x, y)) return { x, y };

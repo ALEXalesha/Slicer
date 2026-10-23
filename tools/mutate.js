@@ -91,6 +91,18 @@ const MUTANTS = [
   { name: 'models list: no own scroll, runs under the panel', file: 'src/renderer/app.css', from: '.models { flex: 0 1 auto; min-height: 0; overflow-y: auto;', to: '.models { flex: none; overflow-y: visible;', app: 'tests/app/review-03.spec.js', grep: 'A3' },
   { name: 'view: turning the view clears the selection', file: 'src/renderer/scene.js', from: 'if (!m.add && e && Math.hypot(e.clientX - m.x, e.clientY - m.y) < 4)', to: 'if (!m.add)', app: 'tests/app/review-03.spec.js', grep: 'B1: turning' },
   { name: 'view: dragging moves only the grabbed model', file: 'src/renderer/scene.js', from: 'const keep = isSel(inst) && !add;', to: 'const keep = false;', app: 'tests/app/review-03.spec.js', grep: 'B2: dragging' },
+  { name: 'print: failed step taken from the last event', file: 'src/renderer/prepare.js', from: "step: r.step || FAIL_STEP[r.code] || (sendState && sendState.step) || 'connect'", to: "step: 'connect'", app: 'tests/app/review-03.spec.js', grep: 'B3: a busy' },
+  { name: 'send: cancel not checked while waiting for the list', file: 'src/core/send.js', from: "    if (signal && signal.aborted) throw new SendError('canceled');\n", to: '', test: 'tests/core/send.test.js' },
+  { name: 'send: cancel before the start not checked', file: 'src/core/send.js', from: '    stop();                                 // последняя возможность', to: '    // последняя возможность', test: 'tests/core/send.test.js' },
+  { name: 'ipc: cancel ignored', file: 'electron/ipc.js', from: 'if (sendCtl) sendCtl.abort();', to: '', app: 'tests/app/review-03.spec.js', grep: 'B4: waiting' },
+  { name: 'print: silent wait for the file', file: 'src/renderer/prepare.js', from: "if (s.step === 'verify' && s.attempts) extra =", to: "if (false) extra =", app: 'tests/app/review-03.spec.js', grep: 'B4: waiting' },
+  { name: 'actions: Slice above the growing part again', file: 'src/renderer/app.css', from: '.actions .status:empty { display: none; }', to: '.actions .status:empty { display: none; } .actions #slice { order: -1; }', app: 'tests/app/review-03.spec.js', grep: 'B5: Slice' },
+  { name: 'print: leveling not shared with the Printer tab', file: 'src/renderer/printer-panel.js', from: "  onSettings((st) => { $('#bed-leveling').checked = !!st.bedLeveling; });", to: '', app: 'tests/app/review-03.spec.js', grep: 'B6: above Print' },
+  { name: 'camera: dim note on the black box', file: 'src/renderer/app.css', from: '.camera .hint { color: #c9ced8;', to: '.camera .hint { color: var(--text-dim);', app: 'tests/app/review-03.spec.js', grep: 'B7: the camera' },
+  { name: 'small window: no compact layout', file: 'src/renderer/app.css', from: '@media (max-height: 720px) {', to: '@media (max-height: 1px) {', app: 'tests/app/review-03.spec.js', grep: 'B8: the smallest' },
+  { name: 'layers: view stays on the whole bed', file: 'src/renderer/prepare.js', from: '    editor.scene.fitBox(editor.platedBox());', to: '', app: 'tests/app/review-03.spec.js', grep: 'B9: after slicing' },
+  { name: 'i18n: no plural forms', file: 'src/renderer/i18n.js', from: 'forms[d === 1 && h !== 11 ? 0 : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 1 : 2]', to: 'forms[2]', test: 'tests/core/i18n.test.js' },
+  { name: 'panel: lone dash when the link is lost', file: 'src/renderer/printer-panel.js', from: "s ? d.state : t(lostOnce ? 'printer.noLink' : 'printer.notConnected')", to: 'd.state', app: 'tests/app/printer-panel.spec.js', grep: 'review B4' },
 ];
 
 const filter = process.argv[2] || '';

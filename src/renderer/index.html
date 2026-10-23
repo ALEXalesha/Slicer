@@ -120,17 +120,24 @@
         <div class="adv-list" id="adv-list"></div>
       </div>
 
+      <!-- Кнопки - внизу блока, всё растущее (шаги печати, статус) - над ними: «Нарезать»,
+           «Печать» и «Экспорт» не прыгают (обзор 23.10 Б5). -->
       <div class="actions">
-        <button id="slice" class="primary big" data-i18n="act.slice">Нарезать</button>
+        <ol class="steps" id="send-steps" hidden></ol>
+        <button id="send-cancel" hidden data-i18n="send.cancel">Отменить отправку</button>
+        <div class="status" id="status" role="status"></div>
         <div class="result" id="result" hidden>
           <span id="res-time"></span><span id="res-weight"></span><span id="res-layers"></span>
+        </div>
+        <button id="slice" class="primary big" data-i18n="act.slice">Нарезать</button>
+        <div class="print-target">
+          <span id="print-target"></span>
+          <label class="check"><input type="checkbox" id="print-leveling"> <span data-i18n="act.leveling">Калибровка стола</span></label>
         </div>
         <div class="row">
           <button id="print" class="primary" disabled data-i18n="act.print">Печать</button>
           <button id="export" disabled data-i18n="act.export">Экспорт на диск</button>
         </div>
-        <div class="status" id="status" role="status"></div>
-        <ol class="steps" id="send-steps" hidden></ol>
       </div>
     </aside>
   </main>

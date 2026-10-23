@@ -1,7 +1,7 @@
 // Раздел «Принтер»: состояние, камера, пауза / продолжить / отмена, ИИ-контроль брака,
 // управление (оси, «домой», температуры, вентиляторы, свет, скорость).
-import { t, formatTime } from './i18n.js';
-import { getSettings, patchSettings } from './app.js';
+import { t, formatTime, getLang } from './i18n.js';
+import { getSettings, patchSettings, onSettings } from './app.js';
 import { ask } from './ask.js';
 
 const $ = (s) => document.querySelector(s);
@@ -100,10 +100,15 @@ function showControl(s) {
   for (const b of $$('#pc-speed button')) b.classList.toggle('active', Number(b.dataset.speed) === speed);
 }
 
+let lostOnce = false;
+
 function showStatus(s) {
   lastStatus = s;
   const d = describeStatus(s);
-  $('#p-state').textContent = d.state;
+  // В4: без статуса - не одинокий «-», а «Не подключён» / «Нет связи».
+  $('#p-state').textContent = s ? d.state : t(lostOnce ? 'printer.noLink' : 'printer.notConnected');
+  $('#ai-pause').disabled = !connected;
+  $('#ai-pause').title = connected ? '' : t('ai.needLink');
   $('#p-file').textContent = d.file;
   $('#p-file').title = d.file;
   $('#p-layer').textContent = d.layer;
@@ -215,6 +220,11 @@ function sendFans() {
   control('fans', { model: v('model'), aux: v('aux'), box: v('box') });
 }
 
+// В6: служба пишет имя брака по-русски; в английском окне - её класс (spaghetti, stringing...).
+function defectName(a) {
+  return getLang() === 'en' && a.cls ? String(a.cls).replace(/_/g, ' ') : a.name;
+}
+
 async function pollAi() {
   aiPolls += 1;
   let r;
@@ -223,10 +233,10 @@ async function pollAi() {
   const a = r.alerts[0];
   $('#ai-alert').hidden = !a;
   if (a) {
-    $('#ai-text').textContent = t('ai.text', { name: a.name, p: Math.round(a.score * 100), layer: a.layer, total: a.total });
+    $('#ai-text').textContent = t('ai.text', { name: defectName(a), p: Math.round(a.score * 100), layer: a.layer, total: a.total });
     if (a.frame) $('#ai-frame').src = a.frame; else $('#ai-frame').removeAttribute('src');
     $('#ai-alert').dataset.id = a.id;
-    $('#ai-alert').dataset.alert = JSON.stringify({ name: a.name, score: a.score, layer: a.layer, total: a.total });
+    $('#ai-alert').dataset.alert = JSON.stringify({ name: a.name, cls: a.cls, score: a.score, layer: a.layer, total: a.total });
   }
 }
 
@@ -239,7 +249,7 @@ function relang() {
   applyTitles();
   showStatus(lastStatus);
   const al = $('#ai-alert').dataset.alert;
-  if (al) { try { const a = JSON.parse(al); $('#ai-text').textContent = t('ai.text', { name: a.name, p: Math.round(a.score * 100), layer: a.layer, total: a.total }); } catch { /* старая плашка */ } }
+  if (al) { try { const a = JSON.parse(al); $('#ai-text').textContent = t('ai.text', { name: defectName(a), p: Math.round(a.score * 100), layer: a.layer, total: a.total }); } catch { /* старая плашка */ } }
 }
 
 function init() {
@@ -247,6 +257,7 @@ function init() {
   $('#printer-host').value = s.printerHost;
   $('#bed-leveling').checked = s.bedLeveling;
   $('#bed-leveling').addEventListener('change', (e) => patchSettings({ bedLeveling: e.target.checked }));
+  onSettings((st) => { $('#bed-leveling').checked = !!st.bedLeveling; });       // и из «Подготовки» (Б6)
   $('#printer-connect').addEventListener('click', connect);
   $('#printer-find').addEventListener('click', find);
   $('#p-pause').addEventListener('click', () => command('pause'));
@@ -280,7 +291,7 @@ function init() {
   P.onStatus(showStatus);
   // Связь пропала: старое «Печатает» и живые кнопки вводили в заблуждение - всё в прочерки,
   // все кнопки выключены, блок управления тоже.
-  P.onLost(() => { connected = ''; conn('printer.lost', null, 'error'); stopCamera(); showStatus(null); });
+  P.onLost(() => { connected = ''; lostOnce = true; conn('printer.lost', null, 'error'); stopCamera(); showStatus(null); });
   showStatus(null);
   applyTitles();
   document.addEventListener('slicer:view', (e) => {

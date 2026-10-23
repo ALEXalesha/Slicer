@@ -213,7 +213,7 @@ function render() {
     const title = el('span', 'adv-sec-title', C.sectionTitle(sec.id, lang()));
     title.title = title.textContent;
     const nChanged = mine.filter((r) => r.changed).length;
-    const count = el('span', 'adv-sec-count', String(mine.length) + (nChanged && view !== 'changed' ? ' · ' + t('adv.changedN', { n: nChanged }) : ''));
+    const count = el('span', 'adv-sec-count', t('adv.rows', { n: mine.length }) + (nChanged && view !== 'changed' ? ' · ' + t('adv.changedN', { n: nChanged }) : ''));      // В14: число с подписью
     head.append(title, count);
     head.addEventListener('click', () => {
       if (searching || view === 'changed') return;
@@ -308,6 +308,13 @@ function buildFilament() {
   }
 }
 
+// В7: в русском окне - «0,20 мм, стандартное», а не «0.20mm Standard»; значение пресета то же.
+function qualityLabel(name) {
+  const m = /^(\d+(?:\.\d+)?)mm (.+?) @/.exec(name);
+  if (!m || getLang() === 'en') return name.split(' @')[0];
+  return m[1].replace('.', ',') + ' мм, ' + t('q.' + m[2]);
+}
+
 function fillSelects() {
   const s = getSettings();
   const q = $('#adv-quality');
@@ -315,7 +322,7 @@ function fillSelects() {
   for (const name of window.__slicerInfo.qualities) {
     const o = document.createElement('option');
     o.value = name;
-    o.textContent = name.split(' @')[0];
+    o.textContent = qualityLabel(name);
     q.append(o);
   }
   q.value = s.quality || '0.20mm Standard @Elegoo CC 0.4 nozzle';
@@ -324,7 +331,7 @@ function fillSelects() {
   for (const name of window.__slicerInfo.plates) {
     const o = document.createElement('option');
     o.value = name;
-    o.textContent = name;
+    o.textContent = t('plate.' + name);
     p.append(o);
   }
   p.value = s.plate;
@@ -363,7 +370,7 @@ async function init() {
     await applyAdvanced(empty);
   });
   document.addEventListener('slicer:mode', (e) => { if (e.detail === 'advanced') load(); });
-  document.addEventListener('slicer:lang', render);
+  document.addEventListener('slicer:lang', () => { fillSelects(); render(); });
   // Филамент сменили здесь или в «Новичке»: база другая, и правки - этого филамента.
   onSettings((s) => {
     if (!base || s.mode !== 'advanced') return;

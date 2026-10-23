@@ -16,6 +16,9 @@ const COLORS = {
 const THEME_BED = {
   dark: { plate: 0x2a2d3a, grid: 0x444a60, axis: 0x5b8def },
   light: { plate: 0xc9d0dc, grid: 0x9aa4b6, axis: 0x3a6fd8 },
+  // «Строгая» и «Тёплая»: плита светлее фона окна, иначе видна одна сетка (В9).
+  formal: { plate: 0x3a414f, grid: 0x5a6476, axis: 0x5b8def },
+  warm: { plate: 0x3d3024, grid: 0x5f4d39, axis: 0xd08a3c },
 };
 
 export class Scene {
@@ -85,9 +88,9 @@ export class Scene {
     this.resize();
   }
 
-  setTheme(light) {
+  setTheme(theme) {
     if (!this.ok) return;
-    const c = THEME_BED[light ? 'light' : 'dark'];
+    const c = THEME_BED[theme === true ? 'light' : theme] || THEME_BED.dark;
     this.bedGroup.clear();
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(BED, BED), new THREE.MeshStandardMaterial({ color: c.plate, roughness: 0.9 }));
     plate.position.set(BED / 2, BED / 2, -0.02);
@@ -102,14 +105,31 @@ export class Scene {
   /** Камера так, чтобы стол целиком помещался в окне любой формы (ревьювер Б3). */
   fitView() {
     if (!this.ok) return;
-    const r = (BED / 2) * Math.SQRT2 * 1.06;
+    // Стол и модели, что стоят за его краем (лишние после «Разложить», В11), - все в кадре.
+    const box = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(BED, BED, 0));
+    if (this.models.visible && this.models.children.length) box.union(new THREE.Box3().setFromObject(this.models, true));
+    const c = box.getCenter(new THREE.Vector3());
+    const s = box.getSize(new THREE.Vector3());
+    const r = Math.max((BED / 2) * Math.SQRT2 * 1.06, Math.hypot(s.x, s.y) / 2 * 1.06);
+    this.lookAt(c.setZ(0), r);
+    this.userMoved = false;
+  }
+
+  /** Камера на рамку моделей (слои после нарезки, Б9): мелкая модель - не пятно посреди стола. */
+  fitBox(box) {
+    if (!this.ok || !box || box.isEmpty()) return;
+    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 12) * 1.15;
+    this.lookAt(box.getCenter(new THREE.Vector3()), r);
+    this.userMoved = true;
+  }
+
+  lookAt(target, r) {
     const vfov = THREE.MathUtils.degToRad(this.camera.fov);
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * this.camera.aspect);
     const d = r / Math.sin(Math.min(vfov, hfov) / 2);
-    this.controls.target.set(BED / 2, BED / 2, 0);
-    this.camera.position.copy(this.controls.target).addScaledVector(DIR, d);
+    this.controls.target.copy(target);
+    this.camera.position.copy(target).addScaledVector(DIR, d);
     this.controls.update();
-    this.userMoved = false;
     this.render();
   }
 

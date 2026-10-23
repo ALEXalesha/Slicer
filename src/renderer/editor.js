@@ -2,7 +2,7 @@
 // перетаскивание мышью, поворот и масштаб ручками и числами, «гранью на стол», зеркало,
 // копии, выравнивание, расстановка, разрез, поддержки кистью. Здесь - состояние моделей
 // и панель инструмента; картинка и мышь - scene.js, геометрия без окна - mesh-ops.js.
-import { t } from './i18n.js';
+import { t, num } from './i18n.js';
 import { Scene, THREE, BED } from './scene.js';
 import * as Ops from './mesh-ops.js';
 import * as History from './history.js';
@@ -121,6 +121,13 @@ export class Editor {
       const spot = Ops.freeSpot({ w: size.x, d: size.y }, taken, { gap: this.spacing() }) || { x: BED + 20 + size.x / 2, y: BED / 2 };
       this.moveCenterTo(inst, spot.x, spot.y);
     }
+  }
+
+  /** Рамка всех моделей на столе (для подгонки вида к слоям). */
+  platedBox() {
+    const b = new THREE.Box3();
+    for (const i of this.items) b.union(this.box(i));
+    return b;
   }
 
   moveCenterTo(inst, x, y) {
@@ -604,8 +611,10 @@ export class Editor {
     // Кисти выбор не нужен: красит модель под курсором; «Очистить» без выбора - у всех, с вопросом.
     if (!sel.length && this.tool !== 'paint') { box.append(h('p', 'hint', t('obj.none'))); return; }
     if (!sel.length) { /* кисть без выбора */ } else if (sel.length === 1) { const n = h('div', 'tp-name', sel[0].name); n.title = sel[0].name; box.append(n); } else box.append(h('p', 'hint', t('obj.many', { n: sel.length })));
-    const warn = st.find((s) => s.big) ? 'obj.big' : st.find((s) => s.off) ? 'obj.offBed' : st.find((s) => s.tiny) ? 'obj.tiny' : '';
-    if (warn) {
+    // Все подходящие предупреждения, а не первое: крошечная модель за краем стола получает и
+    // «может, она в метрах или дюймах?» с ×10 / ×25.4 (В12).
+    const warns = [st.find((s) => s.big) && 'obj.big', st.find((s) => s.off) && 'obj.offBed', st.find((s) => s.tiny) && 'obj.tiny'].filter(Boolean);
+    for (const warn of warns) {
       const p = h('p', 'tp-warn', t(warn, { mm: st[0] ? Math.round(Math.max(st[0].size.x, st[0].size.y, st[0].size.z) * 100) / 100 : 0 }));
       box.append(p);
       const row = h('div', 'row');
@@ -657,12 +666,13 @@ export class Editor {
         const b = this.box(sel[0]);
         const row = h('div', 'tp-row tp-wide');
         row.append(h('span', 'tp-lab', t('cut.height')));
-        const num = h('input'); num.type = 'number'; num.step = '0.1'; num.id = 'tp-cut-z'; num.value = String(this.cut.z);
+        const zIn = h('input'); zIn.type = 'text'; zIn.inputMode = 'decimal'; zIn.id = 'tp-cut-z'; zIn.value = num(this.cut.z, 2);
         const rng = h('input'); rng.type = 'range'; rng.min = String(b.min.z); rng.max = String(b.max.z); rng.step = '0.1'; rng.value = String(this.cut.z);
-        const set = (v) => { if (!Number.isFinite(v)) return; this.cut.z = Math.min(b.max.z - 0.05, Math.max(b.min.z + 0.05, v)); num.value = String(Math.round(this.cut.z * 100) / 100); rng.value = String(this.cut.z); this.updateCutPlane(); };
-        num.onchange = () => set(Number(String(num.value).replace(',', '.')));
+        const set = (v) => { if (!Number.isFinite(v)) return; this.cut.z = Math.min(b.max.z - 0.05, Math.max(b.min.z + 0.05, v)); zIn.value = num(this.cut.z, 2); rng.value = String(this.cut.z); this.updateCutPlane(); };
+        zIn.onchange = () => set(Number(String(zIn.value).replace(',', '.')));
+        zIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') zIn.blur(); });
         rng.oninput = () => set(Number(rng.value));
-        row.append(num);
+        row.append(zIn);
         box.append(row, rng);
         const fl = h('label', 'check');
         const cb = h('input'); cb.type = 'checkbox'; cb.checked = this.cut.flip; cb.onchange = () => { this.cut.flip = cb.checked; };
@@ -727,7 +737,7 @@ export class Editor {
     const b = this.box(inst);
     const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
     const e = new THREE.Euler().setFromQuaternion(inst.mesh.quaternion, 'XYZ');
-    const r1 = (x) => String(Math.round(x * 100) / 100);
+    const r1 = (x) => num(x, 2);                          // В1: в русском окне - запятая
     const vals = {
       pos: { x: c.x, y: c.y },
       rot: { x: THREE.MathUtils.radToDeg(e.x), y: THREE.MathUtils.radToDeg(e.y), z: THREE.MathUtils.radToDeg(e.z) },

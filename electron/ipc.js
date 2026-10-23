@@ -123,6 +123,7 @@ function registerIpc(ctx) {
 
   let last = null;            // последняя нарезка: {gcodePath, info, modelName, filament}
   let sending = false;
+  let sendCtl = null;         // отмена отправки (обзор 23.10 Б4): только до команды старта
 
   ipcMain.handle('settings:get', () => settings);
   ipcMain.handle('settings:set', (_e, patch) => {
@@ -247,15 +248,18 @@ function registerIpc(ctx) {
       const buffer = fs.readFileSync(last.gcodePath);
       const remoteName = printerFileName({ model: last.modelName, filament: last.filament, timeSec: last.info.timeSec });
       const start = !(opts && opts.start === false);
-      const r = await sendToPrinter({ host, buffer, remoteName, start, bedLeveling: settings.bedLeveling, onStep: (s) => send('send:step', s) });
+      sendCtl = new AbortController();
+      const r = await sendToPrinter({ host, buffer, remoteName, start, bedLeveling: settings.bedLeveling, signal: sendCtl.signal, onStep: (s) => send('send:step', s) });
       return Object.assign({ host }, r);
     } catch (e) {
       const { code, message, stack, ...rest } = e;
       return Object.assign({ ok: false, code: code || 'failed', detail: message }, rest);
     } finally {
       sending = false;
+      sendCtl = null;
     }
   });
+  ipcMain.handle('print:cancel', () => { if (sendCtl) sendCtl.abort(); return { ok: !!sendCtl }; });
 
   ipcMain.handle('printer:discover', async () => findPrinters());
 

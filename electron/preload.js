@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('slicer', {
   slice: call('slice'),
   exportGcode: call('export'),
   print: call('print'),
+  cancelPrint: call('print:cancel'),
   onSendStep: listen('send:step'),
   printer: {
     discover: call('printer:discover'),

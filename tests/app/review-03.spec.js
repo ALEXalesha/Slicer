@@ -452,6 +452,7 @@ test('review-03 B5: Slice / Print / Export stay where they are after slicing and
       await win.click('#slice');
       await expect(win.locator('#print')).toBeEnabled({ timeout: 60000 });
       expect(await top(), `${w} after slice`).toEqual(y0);
+      fp.state.status = 0;                                          // поддельный снова свободен
       await win.click('#print');
       await expect(win.locator('#status')).toContainText('Печать началась', { timeout: 30000 });
       expect(await top(), `${w} after print`).toEqual(y0);

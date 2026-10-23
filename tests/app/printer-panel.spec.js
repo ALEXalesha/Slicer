@@ -220,7 +220,8 @@ test('law (review B4): lost connection - dashes, every button off, control block
     await expect(win.locator('#p-pause')).toBeEnabled();
     await fake.close();
     await expect(win.locator('#printer-conn')).toHaveText('Нет связи с принтером');
-    await expect(win.locator('#p-state')).toHaveText('-');
+    await expect(win.locator('#p-state')).toHaveText('Нет связи');                 // не одинокий «-» (обзор 23.10 В4)
+    await expect(win.locator('#ai-pause')).toBeDisabled();
     await expect(win.locator('#p-layer')).toHaveText('-');
     await expect(win.locator('#p-nozzle')).toHaveText('-');
     for (const id of ['#p-pause', '#p-resume', '#p-stop']) await expect(win.locator(id)).toBeDisabled();

@@ -6,7 +6,7 @@ export const TEXT = {
     'mode.novice': 'Новичок', 'mode.advanced': 'Продвинутый',
     'theme.glass': 'Стеклянная', 'theme.formal': 'Строгая', 'theme.light': 'Светлая', 'theme.night': 'Ночная', 'theme.warm': 'Тёплая',
     'stage.empty': 'Перетащите сюда модель (STL, 3MF, OBJ) или откройте её кнопкой',
-    'stage.open': 'Открыть модель', 'stage.add': 'Добавить', 'stage.remove': 'Убрать',
+    'stage.open': 'Открыть модель', 'stage.add': 'Добавить модель', 'stage.remove': 'Убрать',
     'stage.badFile': 'Не удалось прочитать {name}: {why}',
     // Редактор моделей и слои (0.2)
     'stage.loading': 'Открываю {name}…', 'stage.warn': 'В {name} пропущено: {what}',
@@ -132,13 +132,22 @@ export const TEXT = {
     'adv.resetAsk': 'Сбросить все правки «Продвинутого» ({n}: печать и все филаменты)? Вернуть можно Ctrl+Z.', 'adv.resetAsk.yes': 'Сбросить',
     'stage.count': 'Моделей: {n}', 'stage.offCount': 'за краем: {n}', 'stage.removeOff': 'Убрать лишние',
     'stage.removeOffHint': 'Убрать со стола модели, которые стоят за его краем (красные). Вернуть - Ctrl+Z.',
+    // Печать (обзор 23.10 Б4, Б6)
+    'send.cancel': 'Отменить отправку', 'send.canceling': 'Отменяю…', 'send.canceled': 'Отправка отменена, печать не началась.',
+    'send.verifyWait': 'попытка {n} из {max}, {s} из {total} с',
+    'act.sliced': 'Нарезано: {name}', 'adv.rows': '{n} {n:настройка|настройки|настроек}',
+    'printer.notConnected': 'Не подключён', 'printer.noLink': 'Нет связи', 'ai.needLink': 'Нет связи с принтером: пауза не дойдёт',
+    'q.Fine': 'тонкое', 'q.Optimal': 'оптимальное', 'q.Standard': 'стандартное', 'q.Strength': 'прочное', 'q.Draft': 'черновое', 'q.Extra Draft': 'очень черновое',
+    'plate.Textured PEI Plate': 'Текстурная PEI', 'plate.High Temp Plate': 'Высокотемпературная', 'plate.Cool Plate': 'Холодная (Cool)', 'plate.Engineering Plate': 'Инженерная',
+    'act.leveling': 'Калибровка стола', 'act.target': 'Куда: {host}', 'act.targetNone': 'Куда: найду в сети и спрошу',
+    'act.targetHint': 'Адрес принтера меняется во вкладке «Принтер».', 'act.targetNoneHint': 'Адрес не задан: при печати найду принтер в сети и спрошу, на нём ли печатать.',
   },
   en: {
     'tab.prepare': 'Prepare', 'tab.printer': 'Printer',
     'mode.novice': 'Beginner', 'mode.advanced': 'Advanced',
     'theme.glass': 'Glass', 'theme.formal': 'Formal', 'theme.light': 'Light', 'theme.night': 'Night', 'theme.warm': 'Warm',
     'stage.empty': 'Drop a model here (STL, 3MF, OBJ) or open it with the button',
-    'stage.open': 'Open model', 'stage.add': 'Add', 'stage.remove': 'Remove',
+    'stage.open': 'Open model', 'stage.add': 'Add model', 'stage.remove': 'Remove',
     'stage.badFile': 'Could not read {name}: {why}',
     // Model editor and layers (0.2)
     'stage.loading': 'Opening {name}…', 'stage.warn': 'Skipped in {name}: {what}',
@@ -264,6 +273,15 @@ export const TEXT = {
     'adv.resetAsk': 'Reset all Advanced changes ({n}: print and every filament)? Ctrl+Z brings them back.', 'adv.resetAsk.yes': 'Reset',
     'stage.count': 'Models: {n}', 'stage.offCount': 'off the plate: {n}', 'stage.removeOff': 'Remove extra',
     'stage.removeOffHint': 'Remove the models that stand off the plate (red). Ctrl+Z brings them back.',
+    // Print
+    'send.cancel': 'Cancel sending', 'send.canceling': 'Canceling…', 'send.canceled': 'Sending canceled, the print did not start.',
+    'send.verifyWait': 'attempt {n} of {max}, {s} of {total} s',
+    'act.sliced': 'Sliced: {name}', 'adv.rows': '{n} {n:setting|settings}',
+    'printer.notConnected': 'Not connected', 'printer.noLink': 'No connection', 'ai.needLink': 'No connection to the printer: a pause will not reach it',
+    'q.Fine': 'Fine', 'q.Optimal': 'Optimal', 'q.Standard': 'Standard', 'q.Strength': 'Strength', 'q.Draft': 'Draft', 'q.Extra Draft': 'Extra Draft',
+    'plate.Textured PEI Plate': 'Textured PEI Plate', 'plate.High Temp Plate': 'High Temp Plate', 'plate.Cool Plate': 'Cool Plate', 'plate.Engineering Plate': 'Engineering Plate',
+    'act.leveling': 'Bed leveling', 'act.target': 'To: {host}', 'act.targetNone': 'To: will find it and ask',
+    'act.targetHint': 'The printer address is set on the Printer tab.', 'act.targetNoneHint': 'No address set: when printing, the program finds the printer in the network and asks.',
   },
 };
 
@@ -296,6 +314,13 @@ export function t(key, vars) {
 export function applyTexts(root = document) {
   for (const el of root.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
   for (const el of root.querySelectorAll('[data-i18n-placeholder]')) el.placeholder = t(el.dataset.i18nPlaceholder);
+}
+
+/** Дробное число по языку окна: в русском - запятая (В1: было «13.5 г» рядом с «12,5»). */
+export function num(x, digits = 2) {
+  const v = Math.round((Number(x) || 0) * 10 ** digits) / 10 ** digits;
+  const s = String(Object.is(v, -0) ? 0 : v);
+  return lang === 'ru' ? s.replace('.', ',') : s;
 }
 
 export function formatTime(sec) {

@@ -50,7 +50,7 @@ function readAlerts(dir, { nowSec = Date.now() / 1000, freshSec = FRESH_SEC } = 
     if (!Number.isFinite(t) || nowSec - t > freshSec || t - nowSec > 60) continue;
     if (!/^[A-Za-z0-9_-]+$/.test(a.id)) continue;
     const frame = path.join(dir, 'alerts', a.id, 'frame.jpg');
-    out.push({ id: a.id, name: String(a.name || a.cls || ''), score: Number(a.score) || 0, layer: Number(a.layer) || 0,
+    out.push({ id: a.id, name: String(a.name || a.cls || ''), cls: String(a.cls || '').replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 40), score: Number(a.score) || 0, layer: Number(a.layer) || 0,
       total: Number(a.total) || 0, t, framePath: fs.existsSync(frame) ? frame : '' });
   }
   return out.sort((a, b) => b.t - a.t);

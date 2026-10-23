@@ -56,7 +56,7 @@ test('open, slice with the real engine, export to disk', async () => {
     await win.click('#slice');
     await expect(win.locator('#result')).toBeVisible({ timeout: 60000 });
     await expect(win.locator('#res-layers')).toHaveText('100 слоёв');
-    await expect(win.locator('#status')).toHaveText('Kubik_PLA_' + (await win.locator('#status').textContent()).split('_PLA_')[1]);
+    await expect(win.locator('#status')).toHaveText(/^Нарезано: Kubik_PLA_\d+m\.gcode$/);            // обзор 23.10 В3
     const file = path.join(out, 'cube.gcode');
     await app.evaluate(({ dialog }, f) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: f }); }, file);
     await win.click('#export');

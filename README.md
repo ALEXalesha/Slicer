@@ -62,7 +62,7 @@ choices turns layers and Print off: the slice is out of date.
 
 ## Advanced
 
-244 settings in sections, each with a label and a plain description (RU/EN), search by label, description and engine name.
+More than 230 settings in sections (the 244-key catalog minus keys the printer presets do not have), each with a label and a plain description (RU/EN), search by label, description and engine name.
 Input is checked at once: a comma means a dot, "abc" or "5" for the layer height is not stored. Filament changes are kept per
 filament. If the engine still rejects a value, the program names the setting (the engine writes the reason into its `00000.log`).
 

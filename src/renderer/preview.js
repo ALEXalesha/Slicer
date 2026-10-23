@@ -1,6 +1,6 @@
 // Слои после нарезки (пункт 1 Алексея): ползунок слоя, легенда с цветами типов линий
 // (стенки, заполнение, поддержки, перемещения...) и галочками, время по типам.
-import { t, formatTime } from './i18n.js';
+import { t, formatTime, num } from './i18n.js';
 
 const $ = (s) => document.querySelector(s);
 const GROUPS = ['walls', 'infill', 'support', 'adhesion', 'other', 'travel'];
@@ -39,7 +39,7 @@ export class Preview {
     const only = $('#layer-only').checked;
     this.scene.setLayerRange(only ? top - 1 : 0, top - 1, this.visible);
     const z = this.data.layers[top - 1] ? this.data.layers[top - 1].z : 0;
-    $('#layer-label').textContent = t('pv.layer', { n: top, m: n, z: Math.round(z * 100) / 100 });
+    $('#layer-label').textContent = t('pv.layer', { n: top, m: n, z: num(z, 2) });
   }
 
   legend() {
