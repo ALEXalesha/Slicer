@@ -48,13 +48,15 @@ function post({ hostname, port, body, contentType, timeoutMs }) {
  * Кусок, на который принтер не ответил или ответил ошибкой сети/5xx, повторяется до
  * retriesPerChunk раз. Отказ принтера по существу (MD5, параметры) - сразу ошибка.
  */
-async function uploadFile({ host, port, buffer, remoteName, chunkSize = CHUNK, retriesPerChunk = 3, chunkTimeoutMs = 30000, onProgress = () => {} }) {
+async function uploadFile({ host, port, buffer, remoteName, chunkSize = CHUNK, retriesPerChunk = 3, chunkTimeoutMs = 30000, onProgress = () => {}, signal = null }) {
   const { hostname, port: p } = splitHost(host, port);
   const md5 = crypto.createHash('md5').update(buffer).digest('hex');
   const uuid = crypto.randomUUID();
   const total = buffer.length;
   let offset = 0;
   do {
+    // Отмена отправки (обзор 23.10 Б4) - между кусками: начатый кусок доходит до конца.
+    if (signal && signal.aborted) throw new UploadError('canceled');
     const data = buffer.subarray(offset, Math.min(total, offset + chunkSize));
     const { body, contentType } = multipart({ 'S-File-MD5': md5, Check: 1, Offset: offset, Uuid: uuid, TotalSize: total }, { name: remoteName, data });
     let lastErr = null;

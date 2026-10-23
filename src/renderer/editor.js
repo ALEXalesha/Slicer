@@ -5,6 +5,7 @@
 import { t } from './i18n.js';
 import { Scene, THREE, BED } from './scene.js';
 import * as Ops from './mesh-ops.js';
+import * as History from './history.js';
 
 const $ = (s) => document.querySelector(s);
 const ICONS = {
@@ -17,6 +18,8 @@ const ICONS = {
   arrange: '<path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/>',
   copy: '<path d="M8 8h12v12H8zM4 16V4h12"/>',
   delete: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  undo: '<path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  redo: '<path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -35,13 +38,24 @@ export class Editor {
     // Зазор между моделями, мм. С поддержками 6 мм мало: деревья одной модели заходят на пути
     // другой, и движок отказывает (замер 23.10: Benchy и tee - 6 мм отказ, 10 мм уже режется).
     this.spacing = () => 6;
+    this.depth = 0;                    // вложенность undoable: запись в историю - только внешняя
+    this.pending = null;               // снимок до начала жеста мышью (перетаскивание, ручки, мазок)
     this.scene = new Scene($('#viewer'), {
       select: (inst, add) => this.select(inst, add),
+      isSelected: (inst) => this.selected.has(inst.uid),
+      // Б2: тянем за одну из выбранных - едут все выбранные.
+      dragGroup: (inst) => (this.selected.has(inst.uid) ? this.sel().map((i) => i.mesh) : [inst.mesh]),
+      gestureStart: () => this.begin(),
       transforming: (inst) => { if (inst) this.refreshPanel(true); },
-      transformed: (inst) => { if (inst) { this.dropToBed(inst); this.changed(); } },
-      pickFace: (inst, n) => { this.layOnNormal(inst, n); this.changed(); },
-      paint: (inst, p, first) => this.paintAt(inst, p, first),
-      paintEnd: () => this.changed(),
+      transformed: (list) => {
+        for (const inst of [].concat(list || [])) if (inst) this.dropToBed(inst);
+        this.changed();
+        this.commit();
+      },
+      gestureEnd: () => this.commit(),
+      pickFace: (inst, n) => this.undoable(() => { this.layOnNormal(inst, n); this.changed(); }),
+      paint: (inst, p, first) => { if (first) this.begin(); this.paintAt(inst, p, first); },
+      paintEnd: () => { this.changed(); this.commit(); },
       brushRadius: () => this.brush.radius,
     });
     this.buildToolbar();
@@ -161,6 +175,21 @@ export class Editor {
       this.selected.delete(i.uid);
     }
     this.changed();
+  }
+
+  /** Убрать с UI: с подсказкой, что вернуть можно Ctrl+Z. */
+  removeWithNote(list = this.sel()) {
+    const n = list.filter(Boolean).length;
+    if (!n) return;
+    this.remove(list.filter(Boolean));
+    this.onStatus('act.removed', { n }, '');
+  }
+
+  /** «Убрать лишние»: модели за краем стола (после «Разложить» - те, что не влезли). */
+  removeOff() {
+    const off = this.states().filter((s) => s.off).map((s) => this.items.find((i) => i.uid === s.uid));
+    if (off.length) this.remove(off);
+    return off.length;
   }
 
   clone(inst) {
@@ -369,6 +398,9 @@ export class Editor {
       const g = inst.mesh.geometry;
       const f = Ops.subdivideForBrush(g.attributes.position.array, inst.paint);
       g.setAttribute('position', new THREE.BufferAttribute(f.positions, 3));
+      // Старый normal короче нового position: computeVertexNormals пишет в него же, и модель
+      // чернела после первого мазка (обзор 23.10 А1). Нормали - заново под новую сетку.
+      g.deleteAttribute('normal');
       g.computeVertexNormals();
       g.computeBoundingBox(); g.computeBoundingSphere();
       inst.paint = f.paint;
@@ -387,12 +419,107 @@ export class Editor {
     void first;
   }
 
-  clearPaint() {
-    for (const i of this.sel().length ? this.sel() : this.items) { i.paint = null; this.scene.ok && this.scene.setPaintOverlay(i.mesh, null, null); }
+  /**
+   * «Очистить»: у выбранных моделей. Ничего не выбрано - раньше молча стирала раскраску у ВСЕХ
+   * (обзор 23.10 А2); теперь сначала вопрос с числом моделей. Отменяется Ctrl+Z.
+   */
+  async clearPaint() {
+    let list = this.sel().filter((i) => i.paint);
+    if (!this.sel().length) {
+      list = this.items.filter((i) => i.paint);
+      if (!list.length) return false;
+      if (this.confirm && !(await this.confirm('paint.clearAsk', { n: list.length }))) return false;
+    }
+    this.clearPaintOf(list);
+    return true;
+  }
+
+  clearPaintOf(list) {
+    for (const i of list) { i.paint = null; this.scene.ok && this.scene.setPaintOverlay(i.mesh, null, null); }
     this.changed();
   }
 
   painted() { return this.items.some((i) => i.paint && i.paint.includes(1)); }
+
+  // ---------------------------------------------------------------- отмена (обзор 23.10 А2)
+
+  /** Снимок стола. Массив вершин не меняется на месте (кисть ставит новый) - храним ссылку. */
+  snap() {
+    return {
+      items: this.items.map((i) => ({
+        uid: i.uid, name: i.name, geo: i.mesh.geometry.attributes.position.array,
+        pos: i.mesh.position.clone(), quat: i.mesh.quaternion.clone(), scale: i.mesh.scale.clone(),
+        paint: i.paint ? Uint8Array.from(i.paint) : null, fine: i.fine,
+      })),
+      selected: [...this.selected],
+    };
+  }
+
+  static same(a, b) {
+    if (a.items.length !== b.items.length) return false;
+    const samePaint = (p, q) => (!p && !q) || (p && q && p.length === q.length && p.every((v, k) => v === q[k]));
+    return a.items.every((x, k) => {
+      const y = b.items[k];
+      return x.uid === y.uid && x.geo === y.geo && x.name === y.name && x.pos.equals(y.pos) && x.quat.equals(y.quat) && x.scale.equals(y.scale) && samePaint(x.paint, y.paint);
+    });
+  }
+
+  /** Вернуть стол к снимку: модели с той же сеткой остаются, остальные строятся заново. */
+  restore(s) {
+    const old = new Map(this.items.map((i) => [i.uid, i]));
+    const next = [];
+    for (const it of s.items) {
+      let inst = old.get(it.uid);
+      if (inst && inst.mesh.geometry.attributes.position.array === it.geo) old.delete(it.uid);
+      else {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(it.geo, 3));
+        g.computeVertexNormals();
+        g.computeBoundingBox(); g.computeBoundingSphere();
+        inst = { uid: it.uid, mesh: this.scene.makeMesh(g) };
+        inst.mesh.userData.inst = inst;
+      }
+      inst.name = it.name;
+      inst.fine = it.fine;
+      inst.paint = it.paint ? Uint8Array.from(it.paint) : null;
+      inst.mesh.position.copy(it.pos); inst.mesh.quaternion.copy(it.quat); inst.mesh.scale.copy(it.scale);
+      if (this.scene.ok) this.scene.setPaintOverlay(inst.mesh, it.geo, inst.paint);
+      next.push(inst);
+    }
+    for (const i of old.values()) this.scene.removeMesh(i.mesh);
+    this.items = next;
+    this.selected = new Set(s.selected.filter((uid) => next.some((i) => i.uid === uid)));
+    this.cut.z = null;
+    this.changed();
+    this.onSelect && this.onSelect();
+  }
+
+  /** Правка стола одним шагом истории. Вложенные вызовы (разрез = убрать + добавить) - внутри внешнего. */
+  undoable(fn) {
+    if (this.depth) return fn();
+    const before = this.snap();
+    this.depth = 1;
+    let r;
+    try { r = fn(); } finally { this.depth = 0; }
+    this.record(before);
+    return r;
+  }
+
+  record(before) {
+    const after = this.snap();
+    if (Editor.same(before, after)) return;
+    History.push({ kind: 'plate', undo: () => this.restore(before), redo: () => this.restore(after) });
+  }
+
+  begin() { this.pending = this.snap(); }
+  commit() { const p = this.pending; this.pending = null; if (p) this.record(p); }
+
+  selectAll() {
+    this.selected = new Set(this.items.map((i) => i.uid));
+    this.repaint();
+    this.refreshPanel();
+    this.onSelect && this.onSelect();
+  }
 
   // ---------------------------------------------------------------- для нарезки
 
@@ -418,9 +545,19 @@ export class Editor {
         if (b.dataset.tool) this.setTool(b.dataset.tool);
         else if (name === 'arrange') this.arrange();
         else if (name === 'copy') this.copies(1);
-        else if (name === 'delete') this.remove();
+        else if (name === 'delete') this.removeWithNote();
+        else if (name === 'undo') History.undo();
+        else if (name === 'redo') History.redo();
       });
     }
+    const hist = () => {
+      const u = $('#toolbar [data-act="undo"]'), r = $('#toolbar [data-act="redo"]');
+      if (u) u.disabled = !History.canUndo();
+      if (r) r.disabled = !History.canRedo();
+      this.refreshToolbar();
+    };
+    History.onHistory(hist);
+    hist();
     this.texts();
   }
 
@@ -441,10 +578,18 @@ export class Editor {
     this.refreshPanel();
   }
 
+  /** Панель инструментов видна при моделях на столе - и на пустом столе, если есть что отменить. */
+  refreshToolbar() {
+    const tb = $('#toolbar');
+    if (!tb) return;
+    tb.hidden = this.scene.mode !== 'models' || (!this.items.length && !History.canUndo() && !History.canRedo());
+    for (const b of tb.querySelectorAll('button[data-tool], button[data-act="arrange"], button[data-act="copy"], button[data-act="delete"]')) b.disabled = !this.items.length;
+  }
+
   refreshPanel(live = false) {
     const box = $('#tool-panel');
     if (!box) return;
-    $('#toolbar').hidden = !this.items.length || this.scene.mode !== 'models';
+    this.refreshToolbar();
     if (!this.items.length || this.scene.mode !== 'models') { box.hidden = true; return; }
     box.hidden = false;
     const sel = this.sel();
@@ -456,8 +601,9 @@ export class Editor {
     const title = h('div', 'tp-title');
     title.append(h('b', '', t('tool.' + this.tool)));
     box.append(title);
-    if (!sel.length) { box.append(h('p', 'hint', t('obj.none'))); return; }
-    if (sel.length === 1) { const n = h('div', 'tp-name', sel[0].name); n.title = sel[0].name; box.append(n); } else box.append(h('p', 'hint', t('obj.many', { n: sel.length })));
+    // Кисти выбор не нужен: красит модель под курсором; «Очистить» без выбора - у всех, с вопросом.
+    if (!sel.length && this.tool !== 'paint') { box.append(h('p', 'hint', t('obj.none'))); return; }
+    if (!sel.length) { /* кисть без выбора */ } else if (sel.length === 1) { const n = h('div', 'tp-name', sel[0].name); n.title = sel[0].name; box.append(n); } else box.append(h('p', 'hint', t('obj.many', { n: sel.length })));
     const warn = st.find((s) => s.big) ? 'obj.big' : st.find((s) => s.off) ? 'obj.offBed' : st.find((s) => s.tiny) ? 'obj.tiny' : '';
     if (warn) {
       const p = h('p', 'tp-warn', t(warn, { mm: st[0] ? Math.round(Math.max(st[0].size.x, st[0].size.y, st[0].size.z) * 100) / 100 : 0 }));
@@ -542,7 +688,8 @@ export class Editor {
       box.append(row);
       box.append(h('p', 'hint', t('paint.hint')));
       if (this.supportsNone && this.supportsNone()) box.append(h('p', 'hint', t('paint.noneNote')));
-      const cl = h('button', '', t('paint.clear')); cl.id = 'tp-paint-clear'; cl.onclick = () => this.clearPaint();
+      const cl = h('button', '', t(sel.length ? 'paint.clear' : 'paint.clearAll')); cl.id = 'tp-paint-clear';
+      cl.disabled = !(sel.length ? sel : this.items).some((i) => i.paint); cl.onclick = () => this.clearPaint();
       box.append(cl);
     }
   }
@@ -569,6 +716,8 @@ export class Editor {
         else if (kind === 'scl') this.setScale(a, v);
         else if (kind === 'size') this.setSize(a, v);
       });
+      // Enter - принять и уйти из поля: следующий Ctrl+Z - отмена правки стола, а не набора.
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
       row.append(inp);
     }
     return row;
@@ -590,4 +739,10 @@ export class Editor {
       inp.value = r1(vals[inp.dataset.kind][inp.dataset.axis]);
     }
   }
+}
+
+// Каждая правка стола из кнопок, чисел и меню - один шаг Ctrl+Z (обзор 23.10 А2).
+for (const name of ['add', 'remove', 'removeOff', 'copies', 'arrange', 'mirror', 'layFlatAuto', 'center', 'align', 'setPosition', 'setRotation', 'setScale', 'setSize', 'fitToBed', 'scaleBy', 'doCut', 'clearPaintOf']) {
+  const f = Editor.prototype[name];
+  Editor.prototype[name] = function (...args) { return this.undoable(() => f.apply(this, args)); };
 }

@@ -40,7 +40,6 @@
         <p data-i18n="stage.empty">Перетащите сюда модель (STL, 3MF, OBJ) или откройте её кнопкой</p>
         <button id="open-models" class="primary" data-i18n="stage.open">Открыть модель</button>
       </div>
-      <div class="models" id="models"></div>
       <div class="view-switch seg" id="view-switch">
         <button data-show="models" class="active" data-i18n="view.models">Модели</button>
         <button data-show="layers" id="show-layers" disabled data-i18n="view.layers">Слои</button>
@@ -57,8 +56,17 @@
         <button data-act="arrange"></button>
         <button data-act="copy"></button>
         <button data-act="delete"></button>
+        <span class="sep"></span>
+        <button data-act="undo"></button>
+        <button data-act="redo"></button>
       </nav>
-      <div class="tool-panel" id="tool-panel" hidden></div>
+      <!-- Левый столбец: список моделей сверху (со своей прокруткой), панель инструмента снизу -
+           не налезают друг на друга при любом числе моделей (обзор 23.10 А3). -->
+      <div class="left-col" id="left-col">
+        <div class="models-head" id="models-head" hidden></div>
+        <div class="models" id="models"></div>
+        <div class="tool-panel" id="tool-panel" hidden></div>
+      </div>
       <div class="legend" id="legend" hidden></div>
       <div class="layers" id="layers" hidden>
         <span class="layer-label" id="layer-label"></span>

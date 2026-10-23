@@ -148,3 +148,34 @@ test('law: under any mix of faults - at most one start, never camera off, ok mea
       });
     }), { numRuns: 60 });
 });
+
+// Обзор 23.10 Б4: ожидание «принтер видит файл» шло до минуты молча, отменить было нельзя.
+test('verify step reports attempt and seconds; cancel while waiting stops before any start', () => withFake({ faults: { hideFile: true } }, async (fake) => {
+  const ctl = new AbortController();
+  const ticks = [];
+  const p = sendToPrinter({ host: fake.host, buffer: data(1000), remoteName: 'c.gcode', ...fast, verifyTimeoutMs: 5000, signal: ctl.signal,
+    onStep: (s) => { if (s.step === 'verify') { ticks.push(s); if (ticks.length === 3) ctl.abort(); } } });
+  const t0 = Date.now();
+  await assert.rejects(p, (e) => e.code === 'canceled');
+  assert.ok(Date.now() - t0 < 3000, 'cancel took too long');
+  assert.ok(ticks.every((s) => s.attempt === 1 && s.attempts === 3 && s.timeoutSec === 5 && Number.isFinite(s.waitedSec)));
+  assert.strictEqual(fake.commands(128).length, 0);
+}));
+
+test('cancel before the upload: nothing is uploaded, nothing starts', () => withFake({}, async (fake) => {
+  const ctl = new AbortController();
+  const p = sendToPrinter({ host: fake.host, buffer: data(300 * 1024), remoteName: 'd.gcode', ...fast, signal: ctl.signal,
+    onStep: (s) => { if (s.step === 'check-idle') ctl.abort(); } });
+  await assert.rejects(p, (e) => e.code === 'canceled');
+  assert.strictEqual(fake.log.filter((e) => e.http === 'chunk').length, 0);
+  assert.strictEqual(fake.commands(128).length, 0);
+}));
+
+test('cancel during the upload stops between chunks; nothing starts', () => withFake({}, async (fake) => {
+  const ctl = new AbortController();
+  const p = sendToPrinter({ host: fake.host, buffer: data(640 * 1024), remoteName: 'u.gcode', ...fast, signal: ctl.signal,
+    onStep: (s) => { if (s.step === 'upload' && s.sent >= 2 * CH) ctl.abort(); } });
+  await assert.rejects(p, (e) => e.code === 'canceled');
+  assert.ok(fake.log.filter((e) => e.http === 'chunk').length < 10);
+  assert.strictEqual(fake.commands(128).length, 0);
+}));

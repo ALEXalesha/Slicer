@@ -47,7 +47,16 @@ button.big { width: 100%; padding: 12px; font-size: 16px; }
 .drop-hint button { pointer-events: auto; }
 .drop-hint.has-models { inset: auto 12px 12px auto; padding: 0; }
 .drop-hint.has-models p { display: none; }
-.models { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 6px; max-width: 45%; }
+/* Левый столбец (обзор 23.10 А3): список сверху сжимается и прокручивается, панель инструмента снизу
+   не сжимается, но не выше столбца без места под три строки списка. */
+.left-col { position: absolute; left: 12px; top: 12px; bottom: 64px; width: 250px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.left-col > * { pointer-events: auto; }
+.models { flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.models > .chip { flex: none; }
+.models-head { flex: none; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); padding: 0 2px; }
+.models-head[hidden] { display: none; }
+.models-head .off { color: var(--danger); }
+.models-head button { padding: 2px 8px; font-size: 12.5px; margin-left: auto; }
 .models .chip { display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 10px;
   background: var(--glass-bg-strong); border: 1px solid var(--glass-border); }
 .models .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -73,7 +82,7 @@ button.big { width: 100%; padding: 12px; font-size: 16px; }
 .toolbar button.active { background: var(--accent-grad); color: #fff; }
 .toolbar .sep { width: 1px; margin: 4px 4px; background: var(--glass-border); }
 .drop-hint.has-models { inset: auto 12px 64px auto; }
-.tool-panel { position: absolute; left: 12px; bottom: 64px; width: 250px; max-height: calc(100% - 140px); overflow: auto;
+.tool-panel { flex: none; margin-top: auto; max-height: calc(100% - 118px); overflow: auto;
   display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px;
   background: var(--glass-bg-strong); border: 1px solid var(--glass-border); font-size: 12.5px; }
 .tool-panel[hidden] { display: none; }

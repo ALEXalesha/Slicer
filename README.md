@@ -46,6 +46,11 @@ The plate in the window is the print plate: models are sliced exactly where they
   rest on a second plate silently and only the first was printed).
 - **Cut** by height: both parts get a cap (with a hole for hollow models), the upper part can lie cut side down.
 - **Paint supports**: Add, Block, Erase, brush size. Large faces are split for the brush (each triangle into 4, the mesh stays closed).
+- **The eraser - a difference from Orca and Elegoo Slicer**: Erase is its own button next to Add and removes part of a stroke
+  (only where the brush passed, the rest stays). In Orca and Elegoo Slicer erasing hides behind Shift + mouse, and "Clear"
+  wipes everything. Here Clear works on the selected models; with nothing selected it asks first.
+- **Undo**: Ctrl+Z / Ctrl+Y (and toolbar buttons) for every plate edit - delete, move, numbers, arrange, cut, copies, brush -
+  and for Beginner choices and Advanced edits. Ctrl+A selects all models.
 - 3MF from Elegoo Slicer, Orca and Bambu Studio open with their models, placement, rotation and scale; modifier parts are
   not printed (the program says so).
 

@@ -15,8 +15,8 @@ const MUTANTS = [
   { name: 'send: size ignored', file: 'src/core/send.js', from: 'f.size === null || f.size === size', to: 'true', test: 'tests/core/send.test.js' },
   { name: 'send: busy printer not checked', file: 'src/core/send.js', from: 'if (start && isBusy(status))', to: 'if (false)', test: 'tests/core/send.test.js' },
   { name: 'send: old file with the same name', file: 'src/core/send.js', from: 'if (!set.has(name)) return name;', to: 'return name;', test: 'tests/core/send.test.js' },
-  { name: 'send: start retried after no answer', file: 'src/core/send.js', from: 'if (!started) throw new SendError(\'not-started\', { name });',
-    to: 'if (!started) { await client.request(CMD.START, { Filename: remote, StartLayer: 0 }).catch(() => {}); throw new SendError(\'not-started\', { name }); }', test: 'tests/core/send.test.js' },
+  { name: 'send: start retried after no answer', file: 'src/core/send.js', from: 'if (!started) throw new SendError(\'not-started\', { name, step: \'start\' });',
+    to: 'if (!started) { await client.request(CMD.START, { Filename: remote, StartLayer: 0 }).catch(() => {}); throw new SendError(\'not-started\', { name, step: \'start\' }); }', test: 'tests/core/send.test.js' },
   { name: 'upload: chunk not retried', file: 'src/core/upload.js', from: 'for (let i = 0; i <= retriesPerChunk; i++)', to: 'for (let i = 0; i < 1; i++)', test: 'tests/core/send.test.js' },
   { name: 'novice: delta not clamped', file: 'src/core/novice.js', from: 'delta = Math.max(-TEMP_LIMIT, Math.min(TEMP_LIMIT, delta));', to: '', test: 'tests/core/novice.test.js' },
   { name: 'novice: advanced edits leak into novice', file: 'src/core/novice.js', from: 'if (isAdv && advanced && typeof advanced === \'object\')', to: 'if (advanced && typeof advanced === \'object\')', test: 'tests/core/novice.test.js' },
@@ -80,6 +80,17 @@ const MUTANTS = [
   { name: 'tool panel: cut slider wider than the panel', file: 'src/renderer/app.css', from: '.tool-panel input[type="range"] { width: 100%; margin-left: 0; margin-right: 0; }', to: '.tool-panel input[type="range"] { width: 100%; }', app: 'tests/app/review-02.spec.js', grep: 'B6' },
   { name: 'novice: choice buttons wrap', file: 'src/renderer/app.css', from: '.choices button { flex: 1; min-width: 56px; padding-left: 8px; padding-right: 8px; white-space: nowrap; }', to: '.choices button { flex: 1; min-width: 56px; }', app: 'tests/app/review-02.spec.js', grep: 'B6' },
   { name: 'tool panel: cut label cut short', file: 'src/renderer/editor.js', from: "const row = h('div', 'tp-row tp-wide');", to: "const row = h('div', 'tp-row');", app: 'tests/app/review-02.spec.js', grep: 'B6' },
+  // Независимая проверка 23.10 вечером: кисть, ластик, отмена, список моделей, выбор и групповое перетаскивание.
+  { name: 'brush: old normals after the finer mesh', file: 'src/renderer/editor.js', from: "g.deleteAttribute('normal');", to: '', app: 'tests/app/review-03.spec.js', grep: 'keeps its shading - normals' },
+  { name: 'brush: eraser does nothing', file: 'src/renderer/editor.js', from: 'for (const k of hit) inst.paint[k] = code;', to: 'for (const k of hit) if (code) inst.paint[k] = code;', app: 'tests/app/review-03.spec.js', grep: 'eraser' },
+  { name: 'undo: Delete not undoable', file: 'src/renderer/editor.js', from: "['add', 'remove', 'removeOff',", to: "['add', 'removeOff',", app: 'tests/app/review-03.spec.js', grep: 'undo and redo plate' },
+  { name: 'undo: Ctrl+Z by e.key (dead in the Russian layout)', file: 'src/renderer/prepare.js', from: "e.code === 'KeyZ') { e.preventDefault(); if", to: "e.key === 'z') { e.preventDefault(); if", app: 'tests/app/review-03.spec.js', grep: 'undo and redo plate' },
+  { name: 'paint clear: all models without a question', file: 'src/renderer/editor.js', from: "if (this.confirm && !(await this.confirm('paint.clearAsk', { n: list.length }))) return false;", to: '', app: 'tests/app/review-03.spec.js', grep: 'brush "Clear"' },
+  { name: 'advanced: reset without a question', file: 'src/renderer/advanced.js', from: "if (!(await ask(t('adv.resetAsk', { n }), t('adv.resetAsk.yes'), t('ask.no')))) return;", to: '', app: 'tests/app/review-03.spec.js', grep: 'same undo line' },
+  { name: 'undo: novice choice not recorded', file: 'src/renderer/prepare.js', from: "History.pushChange('tempDelta' in patch ? 'choice.temp' : '', before, choice, applyChoice);", to: '', app: 'tests/app/review-03.spec.js', grep: 'same undo line' },
+  { name: 'models list: no own scroll, runs under the panel', file: 'src/renderer/app.css', from: '.models { flex: 0 1 auto; min-height: 0; overflow-y: auto;', to: '.models { flex: none; overflow-y: visible;', app: 'tests/app/review-03.spec.js', grep: 'A3' },
+  { name: 'view: turning the view clears the selection', file: 'src/renderer/scene.js', from: 'if (!m.add && e && Math.hypot(e.clientX - m.x, e.clientY - m.y) < 4)', to: 'if (!m.add)', app: 'tests/app/review-03.spec.js', grep: 'B1: turning' },
+  { name: 'view: dragging moves only the grabbed model', file: 'src/renderer/scene.js', from: 'const keep = isSel(inst) && !add;', to: 'const keep = false;', app: 'tests/app/review-03.spec.js', grep: 'B2: dragging' },
 ];
 
 const filter = process.argv[2] || '';

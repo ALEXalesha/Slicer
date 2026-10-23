@@ -15,7 +15,6 @@ class SendError extends Error {
   }
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Имя, которого ещё нет на принтере: иначе проверка «файл виден» нашла бы старый файл. */
 function uniqueName(name, taken) {
@@ -29,10 +28,23 @@ function uniqueName(name, taken) {
   return `${m[1]}_${Date.now()}${m[2]}`;
 }
 
-async function waitListed(client, remote, size, { timeoutMs, pollMs }) {
-  const deadline = Date.now() + timeoutMs;
+// Пауза, которую прерывает отмена.
+function pause(ms, signal) {
+  return new Promise((resolve) => {
+    if (!signal) { setTimeout(resolve, ms); return; }
+    const t = setTimeout(done, ms);
+    function done() { clearTimeout(t); signal.removeEventListener('abort', done); resolve(); }
+    signal.addEventListener('abort', done);
+  });
+}
+
+async function waitListed(client, remote, size, { timeoutMs, pollMs, signal, onTick = () => {} }) {
+  const t0 = Date.now();
+  const deadline = t0 + timeoutMs;
   let last = null;
   for (;;) {
+    if (signal && signal.aborted) throw new SendError('canceled');
+    onTick(Math.floor((Date.now() - t0) / 1000));
     let list = null;
     try { list = await client.listFiles({ timeoutMs: Math.min(8000, Math.max(1000, deadline - Date.now())) }); } catch { /* повторим */ }
     if (list) {
@@ -44,7 +56,7 @@ async function waitListed(client, remote, size, { timeoutMs, pollMs }) {
       }
     }
     if (Date.now() >= deadline) return last || { ok: false, code: 'not-listed' };
-    await sleep(pollMs);
+    await pause(pollMs, signal);
   }
 }
 
@@ -69,17 +81,22 @@ async function waitStarted(client, timeoutMs, pollMs) {
 async function sendToPrinter({
   host, port, buffer, remoteName, start = true, attempts = 3, bedLeveling = true,
   verifyTimeoutMs = 20000, startTimeoutMs = 60000, pollMs = 1000, chunkSize,
-  connect = PrinterClient.connect, upload = uploadFile, onStep = () => {},
+  connect = PrinterClient.connect, upload = uploadFile, onStep = () => {}, signal = null,
 }) {
   if (!buffer || !buffer.length) throw new SendError('empty');
+  // Отмена (обзор 23.10 Б4): проверяется до каждого шага. После команды старта не отменить:
+  // она уходит один раз, дальше печать идёт на принтере.
+  const stop = () => { if (signal && signal.aborted) throw new SendError('canceled', { step: 'cancel' }); };
   onStep({ step: 'connect' });
   let client;
-  try { client = await connect(host, { port }); } catch (e) { throw new SendError('offline', { detail: e.message }); }
+  try { client = await connect(host, { port }); } catch (e) { throw new SendError('offline', { detail: e.message, step: 'connect' }); }
   try {
+    stop();
     onStep({ step: 'check-idle' });
     let status;
-    try { status = await client.status(); } catch (e) { throw new SendError('offline', { detail: e.message }); }
-    if (start && isBusy(status)) throw new SendError('busy', { status: status && status.PrintInfo && status.PrintInfo.Status });
+    try { status = await client.status(); } catch (e) { throw new SendError('offline', { detail: e.message, step: 'check-idle' }); }
+    if (start && isBusy(status)) throw new SendError('busy', { status: status && status.PrintInfo && status.PrintInfo.Status, step: 'check-idle' });
+    stop();
     let taken = [];
     try { taken = (await client.listFiles()).map((f) => f.name); } catch { /* список не пришёл - имя проверим после загрузки */ }
     const name = uniqueName(remoteName, taken);
@@ -87,36 +104,41 @@ async function sendToPrinter({
 
     let lastErr = null, attempt = 0, listed = false;
     while (attempt < attempts && !listed) {
+      stop();
       attempt += 1;
       onStep({ step: 'upload', attempt, attempts, sent: 0, total: buffer.length });
       try {
-        await upload({ host, port, buffer, remoteName: name, chunkSize,
+        await upload({ host, port, buffer, remoteName: name, chunkSize, signal,
           onProgress: (p) => onStep({ step: 'upload', attempt, attempts, sent: p.sent, total: p.total }) });
       } catch (e) {
-        lastErr = new SendError('upload', { detail: e.code || e.message, attempts: attempt });
+        stop();
+        lastErr = new SendError('upload', { detail: e.code || e.message, attempts: attempt, step: 'upload' });
         continue;
       }
-      onStep({ step: 'verify', attempt });
-      const v = await waitListed(client, remote, buffer.length, { timeoutMs: verifyTimeoutMs, pollMs });
+      const timeoutSec = Math.round(verifyTimeoutMs / 1000);
+      const v = await waitListed(client, remote, buffer.length, { timeoutMs: verifyTimeoutMs, pollMs, signal,
+        onTick: (waitedSec) => onStep({ step: 'verify', attempt, attempts, waitedSec, timeoutSec }) });
       if (v.ok) listed = true;
-      else lastErr = new SendError(v.code, { got: v.got, want: buffer.length, attempts: attempt });
+      else lastErr = new SendError(v.code, { got: v.got, want: buffer.length, attempts: attempt, step: 'verify' });
     }
     if (!listed) throw lastErr;
+    stop();
     if (!start) return { ok: true, name, attempts: attempt, started: false };
 
     onStep({ step: 'start' });
     try {
       const now = await client.status();
-      if (isBusy(now)) throw new SendError('busy', { status: now.PrintInfo && now.PrintInfo.Status });
+      if (isBusy(now)) throw new SendError('busy', { status: now.PrintInfo && now.PrintInfo.Status, step: 'start' });
     } catch (e) { if (e instanceof SendError) throw e; }
+    stop();                                 // последняя возможность отменить - до команды старта
     let ack = null;
     try {
       const r = await client.request(CMD.START, { Filename: remote, StartLayer: 0, Calibration_switch: bedLeveling ? 1 : 0, Tlp_Switch: 0 }, { timeoutMs: 10000 });
       ack = Number(r.Ack);
     } catch { ack = null; }                 // ответа нет - но команда могла дойти: второй раз не шлём
-    if (ack !== null && ack !== 0) throw new SendError('start-rejected', { ack, name });
+    if (ack !== null && ack !== 0) throw new SendError('start-rejected', { ack, name, step: 'start' });
     const started = await waitStarted(client, startTimeoutMs, Math.max(pollMs, 2000));
-    if (!started) throw new SendError('not-started', { name });
+    if (!started) throw new SendError('not-started', { name, step: 'start' });
     onStep({ step: 'started', name });
     return { ok: true, name, attempts: attempt, started: true };
   } finally {

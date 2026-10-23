@@ -67,6 +67,7 @@ export class Scene {
     this.gizmo.addEventListener('change', () => this.render());
     this.gizmo.addEventListener('dragging-changed', (e) => {
       this.controls.enabled = !e.value;
+      if (e.value) this.events.gestureStart && this.events.gestureStart();
       if (!e.value && this.gizmo.object) this.events.transformed && this.events.transformed(this.gizmo.object.userData.inst);
     });
     this.gizmo.addEventListener('objectChange', () => this.events.transforming && this.events.transforming(this.gizmo.object && this.gizmo.object.userData.inst));
@@ -78,6 +79,7 @@ export class Scene {
     canvas.addEventListener('pointerdown', (e) => this.onDown(e), { capture: true });
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
+    this.miss = null;                   // нажали мимо моделей: снять выбор, если отпустят без движения
     canvas.addEventListener('pointerleave', () => { this.brush.visible = false; this.render(); });
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -232,7 +234,8 @@ export class Scene {
     if (this.gizmo.dragging || this.gizmo.axis) return;             // ручки поворота/масштаба
     const hit = this.hitModel(e);
     if (!hit) {
-      if (!e.ctrlKey && !e.shiftKey) this.events.select && this.events.select(null, false);
+      // Б1 (обзор 23.10): поворот вида мышью мимо модели выбор не снимает - только щелчок без движения.
+      this.miss = { x: e.clientX, y: e.clientY, add: e.ctrlKey || e.shiftKey };
       return;
     }
     const inst = hit.object.userData.inst;
@@ -248,14 +251,23 @@ export class Scene {
       this.events.pickFace && this.events.pickFace(inst, n);
       return;
     }
-    this.events.select && this.events.select(inst, e.ctrlKey || e.shiftKey);
+    const add = e.ctrlKey || e.shiftKey;
+    const isSel = (x) => !!(this.events.isSelected && this.events.isSelected(x));
+    // Б2: нажали на одну из выбранных без Ctrl - выбор не трогаем, чтобы тянуть все выбранные;
+    // отпустили без движения - выбрана только она.
+    const keep = isSel(inst) && !add;
+    if (!keep) this.events.select && this.events.select(inst, add);
     if (this.tool === 'move' || this.tool === 'cut') {
+      if (add && !isSel(inst)) return;                    // Ctrl-щелчок снял выбор - тянуть нечего
       const p = this.planePoint(0);
       if (!p) return;
       this.controls.enabled = false;
-      this.drag = { kind: 'move', inst, start: p, moved: false, origin: hit.object.position.clone() };
+      const group = this.events.dragGroup ? this.events.dragGroup(inst) : [hit.object];
+      this.drag = { kind: 'move', inst, start: p, moved: false, x: e.clientX, y: e.clientY, clickOnly: keep,
+        group: group.map((m) => ({ mesh: m, origin: m.position.clone() })) };
+      this.events.gestureStart && this.events.gestureStart();
       this.canvas.setPointerCapture && this.canvas.setPointerCapture(e.pointerId);
-    }
+    } else if (keep) this.events.select && this.events.select(inst, false);
   }
 
   onMove(e) {
@@ -279,18 +291,30 @@ export class Scene {
     const p = this.planePoint(0);
     if (!p) return;
     const d = this.drag;
+    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 3) return;      // дрожь руки при щелчке
     d.moved = true;
-    d.inst.mesh.position.set(d.origin.x + p.x - d.start.x, d.origin.y + p.y - d.start.y, d.origin.z);
+    for (const g of d.group) g.mesh.position.set(g.origin.x + p.x - d.start.x, g.origin.y + p.y - d.start.y, g.origin.z);
     this.events.transforming && this.events.transforming(d.inst);
     this.render();
   }
 
-  onUp() {
+  onUp(e) {
+    if (this.miss) {
+      const m = this.miss;
+      this.miss = null;
+      if (!m.add && e && Math.hypot(e.clientX - m.x, e.clientY - m.y) < 4) this.events.select && this.events.select(null, false);
+    }
     if (!this.drag) return;
     const d = this.drag;
     this.drag = null;
     this.controls.enabled = true;
-    if (d.kind === 'move' && d.moved) this.events.transformed && this.events.transformed(d.inst);
+    if (d.kind === 'move') {
+      if (d.moved) this.events.transformed && this.events.transformed(d.group.map((g) => g.mesh.userData.inst));
+      else {
+        if (d.clickOnly) this.events.select && this.events.select(d.inst, false);
+        this.events.gestureEnd && this.events.gestureEnd();
+      }
+    }
     if (d.kind === 'paint') this.events.paintEnd && this.events.paintEnd(d.inst);
   }
 

@@ -4,7 +4,8 @@ import { t, formatTime } from './i18n.js';
 import { onSettings, getSettings, patchSettings } from './app.js';
 import { Editor } from './editor.js';
 import { Preview } from './preview.js';
-import { confirmHost } from './ask.js';
+import { confirmHost, ask } from './ask.js';
+import * as History from './history.js';
 
 const $ = (s) => document.querySelector(s);
 const S = window.slicer;
@@ -18,6 +19,7 @@ let sendState = null;        // {step, extra, done, fail}
 
 const editor = new Editor({ onChange: () => { invalidate(true); renderModels(); }, onStatus: (key, vars, kind) => setStatus(key, vars, kind) });
 editor.supportsNone = () => choice.supports === 'none';
+editor.confirm = (key, vars) => ask(t(key, vars), t(key + '.yes'), t('ask.no'));
 editor.spacing = () => (choice.supports !== 'none' || editor.painted() ? 12 : 6);
 const preview = new Preview(editor.scene);
 
@@ -86,13 +88,34 @@ function renderModels() {
     rm.textContent = '×';
     rm.title = t('stage.remove');
     rm.dataset.remove = String(s.uid);
-    rm.addEventListener('click', () => editor.remove([editor.items.find((i) => i.uid === s.uid)]));
+    rm.addEventListener('click', () => editor.removeWithNote([editor.items.find((i) => i.uid === s.uid)]));
     chip.append(name, rm);
     box.append(chip);
   }
+  // Шапка списка: сколько моделей и сколько за краем, кнопка «Убрать лишние» (обзор 23.10 А3, В11).
+  const head = $('#models-head');
+  head.textContent = '';
+  const off = states.filter((s) => s.off).length;
+  head.hidden = states.length < 2 && !off;
+  if (!head.hidden) {
+    const n = document.createElement('span');
+    n.textContent = t('stage.count', { n: states.length });
+    head.append(n);
+    if (off) {
+      const o = document.createElement('span');
+      o.className = 'off';
+      o.textContent = t('stage.offCount', { n: off });
+      const b = document.createElement('button');
+      b.id = 'remove-off';
+      b.textContent = t('stage.removeOff');
+      b.title = t('stage.removeOffHint');
+      b.addEventListener('click', () => { const k = editor.removeOff(); if (k) setStatus('act.removed', { n: k }, ''); });
+      head.append(o, b);
+    }
+  }
   $('#drop-hint').classList.toggle('has-models', states.length > 0);
   $('#open-models').textContent = states.length ? t('stage.add') : t('stage.open');
-  $('#toolbar').hidden = !states.length || editor.scene.mode !== 'models';
+  editor.refreshToolbar();
 }
 editor.onSelect = renderModels;
 
@@ -127,11 +150,22 @@ function renderChoice() {
 }
 
 function setChoice(patch) {
+  const before = choice;
   choice = Object.assign({}, choice, patch);
+  // Ctrl+Z возвращает и выбор «Новичка»; ползунок температуры - одним шагом на всё движение.
+  if (JSON.stringify(before) !== JSON.stringify(choice)) History.pushChange('tempDelta' in patch ? 'choice.temp' : '', before, choice, applyChoice);
   renderChoice();
   invalidate();
   editor.refreshPanel();
   patchSettings({ choice });
+}
+
+function applyChoice(c) {
+  choice = Object.assign({}, c);
+  renderChoice();
+  invalidate();
+  editor.refreshPanel();
+  return patchSettings({ choice });
 }
 
 function buildFilaments() {
@@ -313,8 +347,18 @@ async function init() {
   for (const b of document.querySelectorAll('#view-switch button')) b.addEventListener('click', () => { if (!b.disabled) showStage(b.dataset.show); });
   $('#fit-view').addEventListener('click', () => editor.scene.fitView());
   $('#fit-view').title = t('view.fit');
+  // Клавиши редактора. По e.code, а не e.key: в русской раскладке Ctrl+Z приходит как «я».
+  // В текстовом поле Ctrl+Z - его собственная отмена набора.
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Delete' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !$('#view-prepare').hidden) editor.remove();
+    if ($('#view-prepare').hidden || document.querySelector('dialog[open]')) return;
+    const a = document.activeElement;
+    const typing = a && (/SELECT|TEXTAREA/.test(a.tagName) || (a.tagName === 'INPUT' && !['checkbox', 'range', 'radio', 'button'].includes(a.type)));
+    if (typing) return;
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && !e.altKey && e.code === 'KeyZ') { e.preventDefault(); if (e.shiftKey) History.redo(); else History.undo(); }
+    else if (ctrl && !e.altKey && e.code === 'KeyY') { e.preventDefault(); History.redo(); }
+    else if (ctrl && !e.altKey && e.code === 'KeyA' && editor.scene.mode === 'models') { e.preventDefault(); editor.selectAll(); }
+    else if (e.key === 'Delete' && editor.scene.mode === 'models') editor.removeWithNote();
   });
   const theme = () => editor.scene.setTheme(document.documentElement.dataset.theme === 'light');
   new MutationObserver(theme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -334,4 +378,5 @@ window.slicerPrepare = {
   models: () => editor.items.map((m) => m.name),
   choice: () => choice,
   gen: () => gen,
+  history: History,
 };

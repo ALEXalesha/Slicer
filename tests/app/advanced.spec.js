@@ -60,6 +60,7 @@ test('advanced edits, quality and plate reach the G-code; novice ignores them', 
 
     await win.click('#mode button[data-mode="advanced"]');
     await win.click('#adv-reset');
+    await win.click('#confirm-yes');                 // «Сбросить правки» - с вопросом (обзор 23.10 А2)
     await expect(win.locator('#adv-list p.hint')).toHaveText('Ничего не изменено');
   } finally { await app.close(); }
 });

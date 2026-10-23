@@ -6,6 +6,8 @@
 import '../core/settings-catalog.js';
 import { t, getLang } from './i18n.js';
 import { getSettings, patchSettings, onSettings } from './app.js';
+import { ask } from './ask.js';
+import * as History from './history.js';
 
 const C = globalThis.SlicerCatalog;
 const $ = (s) => document.querySelector(s);
@@ -252,9 +254,31 @@ async function setEdit(r, value) {
   else target[r.key] = value;
   if (r.kind === 'filament' && !Object.keys(target).length) delete a.filament[id];
   openRow = r.kind + '.' + r.key;
-  await patchSettings({ advanced: a });
+  History.pushChange('', clone(getSettings().advanced), clone(a), applyAdvanced);
+  await applyAdvanced(a, false);
+}
+
+const clone = (v) => JSON.parse(JSON.stringify(v || { process: {}, filament: {} }));
+
+// Правки «Продвинутого» целиком (из Ctrl+Z / Ctrl+Y и обычной правки).
+async function applyAdvanced(a, clearBad = true) {
+  if (clearBad) bad.clear();
+  await patchSettings({ advanced: clone(a) });
   document.dispatchEvent(new CustomEvent('slicer:advanced'));
   render();
+}
+
+// Качество и пластина: та же лента отмены.
+async function applyPick(key, value) {
+  await patchSettings({ [key]: value });
+  $(key === 'quality' ? '#adv-quality' : '#adv-plate').value = value;
+  document.dispatchEvent(new CustomEvent('slicer:advanced'));
+  await load();
+}
+
+function countEdits(a) {
+  const by = (a && a.filament) || {};
+  return Object.keys((a && a.process) || {}).length + Object.values(by).reduce((n, x) => n + Object.keys(x || {}).length, 0);
 }
 
 // Филамент выбирается общий с «Новичком»: нажимаем его кнопку - он сохранит выбор
@@ -318,13 +342,25 @@ async function init() {
       render();
     });
   }
-  $('#adv-quality').addEventListener('change', async (e) => { await patchSettings({ quality: e.target.value }); document.dispatchEvent(new CustomEvent('slicer:advanced')); load(); });
-  $('#adv-plate').addEventListener('change', async (e) => { await patchSettings({ plate: e.target.value }); document.dispatchEvent(new CustomEvent('slicer:advanced')); load(); });
+  for (const key of ['quality', 'plate']) {
+    const sel = $(key === 'quality' ? '#adv-quality' : '#adv-plate');
+    sel.addEventListener('change', async () => {
+      const before = getSettings()[key];
+      if (before === sel.value) return;
+      History.pushChange('', before, sel.value, (v) => applyPick(key, v));
+      await applyPick(key, sel.value);
+    });
+  }
+  // «Сбросить правки» стирает правки печати и всех пяти филаментов: сначала вопрос с числом
+  // правок, и Ctrl+Z всё возвращает (обзор 23.10 А2).
   $('#adv-reset').addEventListener('click', async () => {
-    bad.clear();
-    await patchSettings({ advanced: { process: {}, filament: {} } });
-    document.dispatchEvent(new CustomEvent('slicer:advanced'));
-    render();
+    const before = clone(getSettings().advanced);
+    const n = countEdits(before);
+    if (!n) { bad.clear(); render(); return; }
+    if (!(await ask(t('adv.resetAsk', { n }), t('adv.resetAsk.yes'), t('ask.no')))) return;
+    const empty = { process: {}, filament: {} };
+    History.pushChange('', before, empty, applyAdvanced);
+    await applyAdvanced(empty);
   });
   document.addEventListener('slicer:mode', (e) => { if (e.detail === 'advanced') load(); });
   document.addEventListener('slicer:lang', render);

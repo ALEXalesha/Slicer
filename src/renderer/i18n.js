@@ -26,7 +26,7 @@ export const TEXT = {
     'obj.big': 'Модель больше стола 256 мм.', 'obj.offBed': 'Стоит за краем стола.',
     'face.hint': 'Щёлкните по грани модели - она ляжет на стол.', 'face.auto': 'Самой большой гранью',
     'cut.height': 'Высота среза, мм', 'cut.flip': 'Верхнюю часть положить срезом вниз', 'cut.do': 'Разрезать',
-    'cut.open': 'Срез не замкнулся в {n} местах (в модели дыры): там крышки нет.', 'cut.done': 'Разрезано на две части.',
+    'cut.open': 'Срез не замкнулся в {n} {n:месте|местах|местах} (в модели дыры): там крышки нет.', 'cut.done': 'Разрезано на две части.',
     'paint.enforce': 'Ставить', 'paint.block': 'Запретить', 'paint.erase': 'Стереть', 'paint.radius': 'Кисть, мм', 'paint.clear': 'Очистить',
     'paint.hint': 'Ведите левой кнопкой по модели. Вид вращается левой кнопкой мимо модели или правой.',
     'paint.noneNote': 'В «Поддержках» выбрано «Нет»: напечатаются только покрашенные места.',
@@ -62,7 +62,7 @@ export const TEXT = {
     'adv.none': 'Ничего не изменено', 'adv.count': 'Показано {n} из {total}',
     'act.slice': 'Нарезать', 'act.print': 'Печать', 'act.export': 'Экспорт на диск',
     'act.slicing': 'Режу модель…', 'act.needModel': 'Сначала откройте модель',
-    'res.time': 'Время {t}', 'res.weight': '{g} г', 'res.layers': '{n} слоёв',
+    'res.time': 'Время {t}', 'res.weight': '{g} г', 'res.layers': '{n} {n:слой|слоя|слоёв}',
     'exp.saved': 'Сохранено: {path}',
     'eng.not-found': 'Не найден движок ElegooSlicer. Установите Elegoo Slicer (он бесплатный) - программа режет его движком.',
     'eng.failed': 'Движок не смог нарезать модель. Частая причина - модель больше стола 256x256x256 мм или испорчена.',
@@ -75,9 +75,9 @@ export const TEXT = {
     'send.ok': 'Печать началась: {name}', 'send.uploaded': 'Файл на принтере: {name}',
     'send.offline': 'Принтер не отвечает. Проверьте, что он включён и в той же сети, и адрес в разделе «Принтер».',
     'send.busy': 'Принтер сейчас занят (печатает или на паузе). Дождитесь конца или отмените печать на принтере.',
-    'send.upload-failed': 'Файл не удалось отправить после {n} попыток: {why}',
-    'send.not-listed': 'Файл отправлен, но принтер его не видит. Отправили {n} раз - принтер не показывает файл в списке.',
-    'send.size-mismatch': 'Файл дошёл не целиком ({got} из {want} байт). Повторили {n} раз - не помогло.',
+    'send.upload-failed': 'Файл не удалось отправить после {n} {n:попытки|попыток|попыток}: {why}',
+    'send.not-listed': 'Файл отправлен, но принтер его не видит. Отправили {n} {n:раз|раза|раз} - принтер не показывает файл в списке.',
+    'send.size-mismatch': 'Файл дошёл не целиком ({got} из {want} байт). Повторили {n} {n:раз|раза|раз} - не помогло.',
     'send.start-rejected': 'Принтер отказался начать печать (код {ack}: {why}).',
     'send.not-started': 'Команда на печать отправлена, но принтер не начал. Посмотрите экран принтера.',
     'send.noHost': 'Принтер не найден в сети. Введите адрес в разделе «Принтер».',
@@ -125,6 +125,13 @@ export const TEXT = {
     'printer.badHost': 'Адрес вида 192.168.0.50',
     'printer.askHost': 'Адрес принтера не задан. Печатать на {name} ({host})?', 'printer.yesHost': 'Печатать на нём', 'printer.noHost': 'Нет',
     'send.hostCanceled': 'Печать не начата: принтер не выбран. Адрес можно ввести в разделе «Принтер».',
+    // Отмена и список моделей (обзор 23.10 А2, А3)
+    'tool.undo': 'Отменить (Ctrl+Z)', 'tool.redo': 'Повторить (Ctrl+Y)', 'ask.no': 'Не надо',
+    'act.removed': 'Убрано моделей: {n}. Вернуть - Ctrl+Z.',
+    'paint.clearAsk': 'Ничего не выбрано. Стереть раскраску поддержек у всех покрашенных моделей ({n})?', 'paint.clearAsk.yes': 'Стереть у всех', 'paint.clearAll': 'Очистить все',
+    'adv.resetAsk': 'Сбросить все правки «Продвинутого» ({n}: печать и все филаменты)? Вернуть можно Ctrl+Z.', 'adv.resetAsk.yes': 'Сбросить',
+    'stage.count': 'Моделей: {n}', 'stage.offCount': 'за краем: {n}', 'stage.removeOff': 'Убрать лишние',
+    'stage.removeOffHint': 'Убрать со стола модели, которые стоят за его краем (красные). Вернуть - Ctrl+Z.',
   },
   en: {
     'tab.prepare': 'Prepare', 'tab.printer': 'Printer',
@@ -151,7 +158,7 @@ export const TEXT = {
     'obj.big': 'The model is larger than the 256 mm plate.', 'obj.offBed': 'Stands off the plate.',
     'face.hint': 'Click a face of the model - it will lie on the plate.', 'face.auto': 'Largest face',
     'cut.height': 'Cut height, mm', 'cut.flip': 'Put the upper part cut side down', 'cut.do': 'Cut',
-    'cut.open': 'The cut is not closed in {n} places (the model has holes): no cap there.', 'cut.done': 'Cut into two parts.',
+    'cut.open': 'The cut is not closed in {n} {n:place|places} (the model has holes): no cap there.', 'cut.done': 'Cut into two parts.',
     'paint.enforce': 'Add', 'paint.block': 'Block', 'paint.erase': 'Erase', 'paint.radius': 'Brush, mm', 'paint.clear': 'Clear',
     'paint.hint': 'Drag with the left button over the model. Rotate the view with the left button off the model or the right button.',
     'paint.noneNote': 'Supports are set to "None": only painted places get supports.',
@@ -187,7 +194,7 @@ export const TEXT = {
     'adv.none': 'Nothing changed', 'adv.count': 'Showing {n} of {total}',
     'act.slice': 'Slice', 'act.print': 'Print', 'act.export': 'Export to disk',
     'act.slicing': 'Slicing…', 'act.needModel': 'Open a model first',
-    'res.time': 'Time {t}', 'res.weight': '{g} g', 'res.layers': '{n} layers',
+    'res.time': 'Time {t}', 'res.weight': '{g} g', 'res.layers': '{n} {n:layer|layers}',
     'exp.saved': 'Saved: {path}',
     'eng.not-found': 'ElegooSlicer engine not found. Install Elegoo Slicer (free) - this program slices with its engine.',
     'eng.failed': 'The engine could not slice the model. Often the model is larger than the 256x256x256 mm bed or broken.',
@@ -200,9 +207,9 @@ export const TEXT = {
     'send.ok': 'Print started: {name}', 'send.uploaded': 'File on the printer: {name}',
     'send.offline': 'The printer does not answer. Check that it is on, in the same network, and the address on the Printer tab.',
     'send.busy': 'The printer is busy (printing or paused). Wait for the end or cancel on the printer.',
-    'send.upload-failed': 'Could not send the file after {n} attempts: {why}',
-    'send.not-listed': 'The file was sent but the printer does not see it. Sent {n} times - it is not in the list.',
-    'send.size-mismatch': 'The file arrived incomplete ({got} of {want} bytes). Retried {n} times.',
+    'send.upload-failed': 'Could not send the file after {n} {n:attempt|attempts}: {why}',
+    'send.not-listed': 'The file was sent but the printer does not see it. Sent {n} {n:time|times} - it is not in the list.',
+    'send.size-mismatch': 'The file arrived incomplete ({got} of {want} bytes). Retried {n} {n:time|times}.',
     'send.start-rejected': 'The printer refused to start (code {ack}: {why}).',
     'send.not-started': 'The print command was sent but the printer did not start. Check the printer screen.',
     'send.noHost': 'No printer found in the network. Enter the address on the Printer tab.',
@@ -250,6 +257,13 @@ export const TEXT = {
     'printer.badHost': 'An address like 192.168.0.50',
     'printer.askHost': 'No printer address is set. Print on {name} ({host})?', 'printer.yesHost': 'Print on it', 'printer.noHost': 'No',
     'send.hostCanceled': 'The print did not start: no printer chosen. Enter the address on the Printer tab.',
+    // Undo and the model list
+    'tool.undo': 'Undo (Ctrl+Z)', 'tool.redo': 'Redo (Ctrl+Y)', 'ask.no': 'Cancel',
+    'act.removed': 'Models removed: {n}. Ctrl+Z brings them back.',
+    'paint.clearAsk': 'Nothing is selected. Erase the support paint of all painted models ({n})?', 'paint.clearAsk.yes': 'Erase on all', 'paint.clearAll': 'Clear all',
+    'adv.resetAsk': 'Reset all Advanced changes ({n}: print and every filament)? Ctrl+Z brings them back.', 'adv.resetAsk.yes': 'Reset',
+    'stage.count': 'Models: {n}', 'stage.offCount': 'off the plate: {n}', 'stage.removeOff': 'Remove extra',
+    'stage.removeOffHint': 'Remove the models that stand off the plate (red). Ctrl+Z brings them back.',
   },
 };
 
@@ -257,9 +271,25 @@ let lang = 'ru';
 export function setLang(l) { lang = TEXT[l] ? l : 'ru'; document.documentElement.lang = lang; }
 export function getLang() { return lang; }
 
+/**
+ * Форма слова по числу (обзор 23.10 Б10: было «72 слоёв», «Отправили 3 раз»). В тексте -
+ * {n:слой|слоя|слоёв} (1, 2-4, 5-20) или {n:layer|layers} (1, остальное).
+ */
+export function plural(n, forms, l = lang) {
+  const x = Math.abs(Math.trunc(Number(n) || 0));
+  if (l === 'ru' && forms.length >= 3) {
+    const d = x % 10, h = x % 100;
+    return forms[d === 1 && h !== 11 ? 0 : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 1 : 2];
+  }
+  return forms[x === 1 ? 0 : forms.length - 1];
+}
+
 export function t(key, vars) {
   let s = (TEXT[lang] && TEXT[lang][key]) || TEXT.ru[key] || key;
-  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
+  if (vars) {
+    s = s.replace(/\{(\w+):([^{}]+)\}/g, (m, k, f) => (vars[k] !== undefined ? plural(vars[k], f.split('|')) : m));
+    s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
+  }
   return s;
 }
 
