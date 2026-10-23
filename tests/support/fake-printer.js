@@ -77,6 +77,8 @@ async function startFakePrinter(opts = {}) {
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/video') {
       log.push({ http: 'video' });
+      // noVideo - камера занята другой программой или зависла: ответ без картинки.
+      if (faults.noVideo) { res.writeHead(503); res.end(); return; }
       res.writeHead(200, { 'Content-Type': 'multipart/x-mixed-replace; boundary=frame' });
       res.write('--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ' + TINY_JPEG.length + '\r\n\r\n');
       res.write(TINY_JPEG);

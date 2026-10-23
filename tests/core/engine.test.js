@@ -161,3 +161,20 @@ test('real engine: bad values are reported as bad-setting, a big model is not', 
   const big = writeCube(path.join(src, 'big.stl'), 300);
   await assert.rejects(run(big, {}), (e) => (e.code === 'failed' || e.code === 'empty') && !e.key);
 });
+
+// Обзор 0.2 А1: модели слишком близко (обычно из-за поддержек) - движок пишет в журнал
+// «gcode path conflicts found between A and B» и отказывает. Человек должен узнать, какие
+// модели раздвинуть, а не «модель больше стола».
+test('fake engine: a path conflict in the engine log gives conflict with both object names', async () => {
+  const src = tmp('slicer-src-');
+  const cube = writeCube(path.join(src, 'c.stl'), 20);
+  const jobDir = tmp('slicer-job-');
+  const configs = { machine: { name: 'M' }, process: { name: 'P' }, filament: { name: 'F' } };
+  const j = prepareJob({ jobDir, models: [{ path: cube }], configs });
+  process.env.FAKE_ENGINE = 'conflict';
+  process.env.FAKE_CONFLICT = '3DBenchy tee_v2.1';
+  try {
+    await assert.rejects(slice({ exe: FAKE, jobDir, ...j, keys: ['layer_height'] }),
+      (e) => e.code === 'conflict' && JSON.stringify(e.names) === JSON.stringify(['3DBenchy', 'tee_v2.1']));
+  } finally { delete process.env.FAKE_ENGINE; delete process.env.FAKE_CONFLICT; }
+});

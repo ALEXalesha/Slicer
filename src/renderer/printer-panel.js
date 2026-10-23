@@ -129,7 +129,15 @@ async function startCamera() {
 // Команду «выключить поток» принтеру не шлём: она ломает камеру всем.
 function stopCamera() {
   $('#camera').removeAttribute('src');
-  $('#camera-hint').hidden = false;
+  cameraHint('printer.noCamera');
+}
+
+// Подпись поверх окна камеры: ключ в data-i18n, чтобы смена языка её переводила.
+function cameraHint(key) {
+  const h = $('#camera-hint');
+  h.dataset.i18n = key;
+  h.textContent = t(key);
+  h.hidden = false;
 }
 
 async function connect() {
@@ -265,6 +273,10 @@ function init() {
   $('#pc-light').addEventListener('change', (e) => control('light', { on: e.target.checked ? 1 : 0 }));
   for (const b of $$('#pc-speed button')) b.addEventListener('click', () => control('speed', { pct: Number(b.dataset.speed) }));
 
+  // Камера не ответила (занята другой программой, зависла) - не пустой чёрный прямоугольник,
+  // а слова (обзор 0.2 Б3).
+  $('#camera').addEventListener('error', () => { if ($('#camera').getAttribute('src')) cameraHint('printer.cameraLost'); });
+  $('#camera').addEventListener('load', () => { $('#camera-hint').hidden = true; });
   P.onStatus(showStatus);
   // Связь пропала: старое «Печатает» и живые кнопки вводили в заблуждение - всё в прочерки,
   // все кнопки выключены, блок управления тоже.

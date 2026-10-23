@@ -16,8 +16,9 @@ let gen = 0;                 // поколение стола и выборов:
 let status = { key: '', vars: {}, kind: '' };
 let sendState = null;        // {step, extra, done, fail}
 
-const editor = new Editor({ onChange: () => { invalidate(); renderModels(); }, onStatus: (key, vars, kind) => setStatus(key, vars, kind) });
+const editor = new Editor({ onChange: () => { invalidate(true); renderModels(); }, onStatus: (key, vars, kind) => setStatus(key, vars, kind) });
 editor.supportsNone = () => choice.supports === 'none';
+editor.spacing = () => (choice.supports !== 'none' || editor.painted() ? 12 : 6);
 const preview = new Preview(editor.scene);
 
 // Статус хранится ключом и параметрами: при смене языка перерисовывается (ревьювер Б1).
@@ -34,9 +35,19 @@ function drawStatus() {
   el.className = 'status' + (kind ? ' ' + kind : '');
 }
 
-function invalidate() {
+// Статусы прошлого действия над столом (нарезка, расстановка, разрез, экспорт, печать)
+// после следующей правки стола уже неправда: зелёное «Все модели на столе.» висело, когда
+// модель ушла за край (обзор 0.2 Б1). Остаются только «движок не найден» и загрузка файла.
+// Смена режима или настройки стол не трогает: «движок не принял настройку X» должна дожить
+// до вкладки «Продвинутый».
+function stale(s) {
+  if (!s.key || s.key === 'eng.not-found' || s.key.startsWith('stage.')) return false;
+  return s.kind === 'ok' || s.kind === 'error' || /^(arr|eng|act|cut|exp|send)\./.test(s.key) || s.key === '=';
+}
+
+function invalidate(plate = false) {
   gen++;
-  if (sliced && status.kind === 'ok') setStatus('');
+  if (plate === true ? stale(status) : sliced && status.kind === 'ok') setStatus('');
   sliced = null;
   $('#result').hidden = true;
   $('#print').disabled = true;
@@ -157,6 +168,7 @@ async function doSlice() {
     if (my !== gen) { setStatus('act.stale', {}, 'error'); return; }
     if (!r.ok) {
       if (r.code === 'off-bed') setStatus('eng.off-bed', { names: (r.names || []).join(', ') }, 'error');
+      else if (r.code === 'conflict') setStatus('eng.conflict', { a: (r.names || [])[0] || '', b: (r.names || [])[1] || '' }, 'error');
       else if (r.code === 'no-models') setStatus('act.needModel', {}, 'error');
       else if (r.code === 'preset') setStatus('eng.preset', { why: r.detail || '' }, 'error');
       else setStatus(ENGINE_CODES.includes(r.code) ? 'eng.' + r.code : 'eng.failed', { why: r.detail || '' }, 'error');

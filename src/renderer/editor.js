@@ -32,6 +32,9 @@ export class Editor {
     this.brush = { mode: 1, radius: 3 };
     this.cut = { z: null, flip: true };
     this.lock = true;
+    // Зазор между моделями, мм. С поддержками 6 мм мало: деревья одной модели заходят на пути
+    // другой, и движок отказывает (замер 23.10: Benchy и tee - 6 мм отказ, 10 мм уже режется).
+    this.spacing = () => 6;
     this.scene = new Scene($('#viewer'), {
       select: (inst, add) => this.select(inst, add),
       transforming: (inst) => { if (inst) this.refreshPanel(true); },
@@ -101,7 +104,7 @@ export class Editor {
       const b = this.box(inst);
       const size = b.getSize(new THREE.Vector3());
       const taken = this.items.filter((i) => i !== inst && (!added.includes(i) || added.indexOf(i) < added.indexOf(inst))).map((i) => { const x = this.box(i); return { min: x.min.toArray(), max: x.max.toArray() }; });
-      const spot = Ops.freeSpot({ w: size.x, d: size.y }, taken) || { x: BED + 20 + size.x / 2, y: BED / 2 };
+      const spot = Ops.freeSpot({ w: size.x, d: size.y }, taken, { gap: this.spacing() }) || { x: BED + 20 + size.x / 2, y: BED / 2 };
       this.moveCenterTo(inst, spot.x, spot.y);
     }
   }
@@ -184,7 +187,7 @@ export class Editor {
   arrange() {
     if (!this.items.length) return;
     const boxes = this.items.map((i) => this.box(i));
-    const r = Ops.arrange(boxes.map((b) => { const s = b.getSize(new THREE.Vector3()); return { w: s.x, d: s.y }; }));
+    const r = Ops.arrange(boxes.map((b) => { const s = b.getSize(new THREE.Vector3()); return { w: s.x, d: s.y }; }), { gap: this.spacing() });
     this.items.forEach((inst, k) => this.moveCenterTo(inst, r.centers[k].x, r.centers[k].y));
     this.changed();
     if (r.overflow.length) this.onStatus('arr.over', { n: this.items.length - r.overflow.length, m: this.items.length }, 'error');
@@ -483,7 +486,7 @@ export class Editor {
       mir.append(h('span', 'tp-lab', t('obj.mirror')));
       for (const a of ['x', 'y', 'z']) { const b = h('button', '', a.toUpperCase()); b.dataset.mirror = a; b.onclick = () => this.mirror(a); mir.append(b); }
       box.append(mir);
-      const cp = h('div', 'tp-row');
+      const cp = h('div', 'tp-row tp-copies');
       cp.append(h('span', 'tp-lab', t('obj.copies')));
       const n = h('input'); n.type = 'number'; n.min = '1'; n.max = '50'; n.value = '1'; n.id = 'tp-copies';
       const go = h('button', '', t('obj.addCopies')); go.id = 'tp-copies-go';
@@ -506,7 +509,7 @@ export class Editor {
       if (sel.length === 1) {
         this.updateCutPlane();
         const b = this.box(sel[0]);
-        const row = h('div', 'tp-row');
+        const row = h('div', 'tp-row tp-wide');
         row.append(h('span', 'tp-lab', t('cut.height')));
         const num = h('input'); num.type = 'number'; num.step = '0.1'; num.id = 'tp-cut-z'; num.value = String(this.cut.z);
         const rng = h('input'); rng.type = 'range'; rng.min = String(b.min.z); rng.max = String(b.max.z); rng.step = '0.1'; rng.value = String(this.cut.z);

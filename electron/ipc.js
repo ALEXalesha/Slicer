@@ -213,6 +213,11 @@ function registerIpc(ctx) {
         const label = Catalog.label(e.key, settings.lang) || e.key;
         return { ok: false, code: 'bad-setting', key: e.key, detail: '«' + label + '» (' + e.key + '): ' + detail };
       }
+      // conflict: движок называет объекты именами из 3MF стола, человеку - имена из окна.
+      if (e.code === 'conflict' && Array.isArray(e.names)) {
+        const names = e.names.map((n) => (plate.objects.find((o) => o.name === n) || {}).title || n);
+        return { ok: false, code: 'conflict', names, detail };
+      }
       return { ok: false, code: e.code || 'failed', detail };
     }
   });

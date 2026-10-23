@@ -85,12 +85,16 @@ button.big { width: 100%; padding: 12px; font-size: 16px; }
 .tp-warn { margin: 0; color: var(--danger); overflow-wrap: anywhere; }
 .tp-row { display: grid; grid-template-columns: 82px repeat(auto-fit, minmax(0, 1fr)); gap: 4px; align-items: center; }
 .tp-lab { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Строка с одним полем: подпись во всю свою длину («Высота среза, мм» не режется - обзор 0.2 Б6). */
+.tp-row.tp-wide { grid-template-columns: auto minmax(64px, 1fr); }
+.tp-row.tp-copies { grid-template-columns: 82px 56px minmax(0, 1fr); }
+.tool-panel button { white-space: nowrap; }
 .tp-align { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .tp-align .tp-lab { width: 100%; }
 .tool-panel .seg button { flex: 1; }
 .tool-panel .check { margin-top: 2px; }
-.tool-panel input[type="range"] { width: 100%; }
-.legend { position: absolute; left: 12px; bottom: 12px; top: 56px; width: 220px; overflow: auto; padding: 8px 10px; border-radius: 12px;
+.tool-panel input[type="range"] { width: 100%; margin-left: 0; margin-right: 0; }
+.legend { position: absolute; left: 12px; top: 56px; max-height: calc(100% - 68px); width: 220px; overflow: auto; padding: 8px 10px; border-radius: 12px;
   background: var(--glass-bg-strong); border: 1px solid var(--glass-border); font-size: 12.5px; }
 .legend[hidden] { display: none; }
 .lg-group { margin: 6px 0 2px; color: var(--text-dim); font-weight: 600; }
@@ -132,7 +136,7 @@ select:hover:not(:disabled) { background-color: var(--glass-bg-strong); }
 .card { padding: 12px 14px; border-radius: 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); }
 .card h3 { margin: 0 0 8px; font-size: 14px; display: flex; justify-content: space-between; }
 .choices { display: flex; gap: 6px; flex-wrap: wrap; }
-.choices button { flex: 1; min-width: 56px; }
+.choices button { flex: 1; min-width: 56px; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
 .choices button.active { background: var(--accent-grad); border-color: transparent; color: #fff; font-weight: 600; }
 :root[data-theme="light"] .choices button.active { background: var(--accent); }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
@@ -224,11 +228,13 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 #view-printer > * { min-width: 0; flex-shrink: 0; }
 #view-printer .printer-body { flex: 1 0 auto; min-height: 300px; }
 #view-printer .status, #view-printer p, #view-printer h2 { overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
-.printer-head .status { flex: 1 1 200px; }
+.printer-head .status { flex: 1 1 200px; margin-bottom: 8px; }
 .pstate { min-width: 0; }
 #p-file { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; margin: 0 0 8px; min-height: 1.4em; }
-.pcontrol { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
-.pc-card { min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 8px; }
+/* Гибкий ряд, а не сетка auto-fit: строка сообщений во всю ширину занимала все колонки, и на
+   1280 у трёх карточек оставалась пустая четвёртая (обзор 0.2 Б2). */
+.pcontrol { display: flex; flex-wrap: wrap; gap: 12px; }
+.pc-card { flex: 1 1 270px; min-width: 0; padding: 12px 14px; border-radius: 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 8px; }
 .pc-card h3 { margin: 0; font-size: 14px; }
 .pc-steprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pc-steprow .seg button { padding: 4px 10px; }
@@ -254,4 +260,14 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 .pc-fan b { text-align: right; font-variant-numeric: tabular-nums; }
 #pc-fans .check { margin: 0; }
 #pc-speed button { padding: 4px 8px; font-size: 12.5px; }
-.pc-msg { grid-column: 1 / -1; margin: 0; }
+.pc-msg { flex: 1 0 100%; margin: 0; }
+
+/* Светлая тема (обзор 0.2 Б4): панели поверх стола почти непрозрачные - сетка стола не идёт
+   сквозь текст; зелёный «готово» темнее, чтобы читался на светлом (контраст от 4.5). */
+:root[data-theme="light"] { --success: #08694f; }
+:root[data-theme="light"] .tool-panel, :root[data-theme="light"] .legend, :root[data-theme="light"] .toolbar { background: rgba(255, 255, 255, 0.9); }
+
+/* Крестик очистки поиска в цвет текста темы, а не тёмно-синий по умолчанию (обзор 0.2 В1). */
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; cursor: pointer;
+  background: var(--text-dim);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; }

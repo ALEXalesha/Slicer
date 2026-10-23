@@ -77,7 +77,13 @@ async function slice({ exe, jobDir, configFiles, modelFiles, arrange = 1, timeou
   if (r.err && (r.err.killed || r.err.signal)) throw new EngineError('timeout', tail);
   const gcodePath = path.join(outDir, 'plate_1.gcode');
   if (r.err || !fs.existsSync(gcodePath)) {
-    const why = reasonLine(engineLog(jobDir) + '\n' + r.stdout + '\n' + r.stderr);
+    const log = engineLog(jobDir);
+    // Модели слишком близко (обычно поддержки-деревья одной заходят на другую): движок из
+    // командной строки считает это ошибкой (замер 23.10: Benchy и tee в 6 мм с поддержками).
+    // Имена объектов в 3MF стола - safeBase, без пробелов.
+    const conflict = /gcode path conflicts found between (\S+) and (\S+)/i.exec(log);
+    if (conflict) throw Object.assign(new EngineError('conflict', conflict[0]), { names: [conflict[1], conflict[2]] });
+    const why = reasonLine(log + '\n' + r.stdout + '\n' + r.stderr);
     const key = why && keys.length ? findKeyInText(why, keys, preferred) : null;
     if (key) throw Object.assign(new EngineError('bad-setting', why), { key });
     throw new EngineError('failed', tail || (r.err && String(r.err.code)) || 'no output');
