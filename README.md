@@ -1,3 +1,5 @@
+<img src="assets/icon.png" width="96" alt="">
+
 # Slicer CC
 
 A slicer for one printer, the Elegoo Centauri Carbon. Slicing is done by the proven ElegooSlicer engine (an OrcaSlicer fork);
