@@ -1,3 +1,5 @@
+<img src="assets/icon.png" width="96" alt="">
+
 # Slicer CC
 
 Слайсер для одного принтера - Elegoo Centauri Carbon. Режет проверенный движок ElegooSlicer (форк OrcaSlicer), а программа
